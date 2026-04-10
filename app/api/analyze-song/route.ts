@@ -87,6 +87,46 @@ async function runAnalyzer(
     throw lastError ?? new Error("Failed to run song analysis");
 }
 
+async function runRemoteAnalyzer(
+    requestFile: File,
+    songId: string,
+    options: {
+        detectChords: boolean;
+        skipBpm?: boolean;
+    }
+): Promise<ScriptAnalysis> {
+    const analysisApiUrl = process.env.ANALYSIS_API_URL;
+    if (!analysisApiUrl) {
+        throw new Error("Missing ANALYSIS_API_URL");
+    }
+
+    const formData = new FormData();
+    formData.append("songId", songId);
+    formData.append("detectChords", String(options.detectChords));
+    formData.append("skipBpm", String(Boolean(options.skipBpm)));
+    formData.append("file", requestFile, requestFile.name || "track.mp3");
+
+    const response = await fetch(`${analysisApiUrl.replace(/\/$/, "")}/analyze`, {
+        method: "POST",
+        body: formData,
+    });
+
+    if (!response.ok) {
+        let remoteMessage = "Failed to analyze song";
+
+        try {
+            const errorPayload = (await response.json()) as { detail?: string; error?: string };
+            remoteMessage = errorPayload.detail || errorPayload.error || remoteMessage;
+        } catch {
+            // ignore JSON parse failure and keep fallback message
+        }
+
+        throw new Error(remoteMessage);
+    }
+
+    return (await response.json()) as ScriptAnalysis;
+}
+
 export async function POST(request: Request) {
     const formData = await request.formData();
     const songId = formData.get("songId");
@@ -106,13 +146,23 @@ export async function POST(request: Request) {
     const tempFilePath = join(tmpdir(), `jam-analysis-${randomUUID()}${extension}`);
 
     try {
-        const arrayBuffer = await file.arrayBuffer();
-        await writeFile(tempFilePath, new Uint8Array(arrayBuffer));
+        let analysis: ScriptAnalysis;
 
-        const analysis = await runAnalyzer(songId, tempFilePath, {
-            detectChords,
-            skipBpm,
-        });
+        if (process.env.ANALYSIS_API_URL) {
+            analysis = await runRemoteAnalyzer(file, songId, {
+                detectChords,
+                skipBpm,
+            });
+        } else {
+            const arrayBuffer = await file.arrayBuffer();
+            await writeFile(tempFilePath, new Uint8Array(arrayBuffer));
+
+            analysis = await runAnalyzer(songId, tempFilePath, {
+                detectChords,
+                skipBpm,
+            });
+        }
+
         return Response.json(analysis);
     } catch (error) {
         const message = error instanceof Error ? error.message : "Failed to analyze song";
