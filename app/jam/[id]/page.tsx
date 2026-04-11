@@ -249,6 +249,9 @@ function saveSong(updatedSong: Song) {
 export default function Page({ params }: { params: Promise<{ id: string }> }) {
     const { id } = use(params);
     const audioRef = useRef<HTMLAudioElement | null>(null);
+    const metronomeAudioContextRef = useRef<AudioContext | null>(null);
+    const metronomeBufferRef = useRef<AudioBuffer | null>(null);
+    const metronomeIntervalRef = useRef<number | null>(null);
     const songRecord = useMemo(() => readSongRecord(id), [id]);
 
     const [songDrafts, setSongDrafts] = useState<Record<string, Song>>({});
@@ -262,6 +265,8 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
     const [masterVolume, setMasterVolume] = useState(1);
     const [noteDisplayMode, setNoteDisplayMode] = useState<NoteDisplayMode>("notes");
     const [tempoDisplayMode, setTempoDisplayMode] = useState<"percent" | "bpm">("percent");
+    const [metronomeEnabled, setMetronomeEnabled] = useState(false);
+    const [metronomeOpen, setMetronomeOpen] = useState(false);
     const [panelOpen, setPanelOpen] = useState(false);
     const [fretboardTheme, setFretboardTheme] = useState<FretboardTheme>("dark");
     const [editingName, setEditingName] = useState(false);
@@ -272,6 +277,10 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
     const [loopMode, setLoopMode] = useState(false);
     const [loopRange, setLoopRange] = useState<LoopRange | null>(null);
     const [loopDraft, setLoopDraft] = useState<LoopRange | null>(null);
+    const [metronomeBpmOverride, setMetronomeBpmOverride] = useState<{
+        songId: string;
+        bpm: number;
+    } | null>(null);
     const song = songDrafts[id] ?? songRecord.song;
     const songFound = songRecord.found || Boolean(songDrafts[id]);
 
@@ -304,6 +313,28 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
         analysis.bpm !== null
             ? formatDisplayedBpmValue(analysis.bpm)
             : formatDisplayedBpmValue(song.bpm);
+    const initialMetronomeBpm = useMemo(() => {
+        if (typeof displayBpm === "number" && Number.isFinite(displayBpm) && displayBpm > 0) {
+            return displayBpm;
+        }
+
+        if (typeof song.bpm === "number" && Number.isFinite(song.bpm) && song.bpm > 0) {
+            return Math.round(song.bpm);
+        }
+
+        if (typeof song.bpm === "string") {
+            const parsed = Number(song.bpm);
+            if (Number.isFinite(parsed) && parsed > 0) {
+                return Math.round(parsed);
+            }
+        }
+
+        return 100;
+    }, [displayBpm, song.bpm]);
+    const metronomeBpm =
+        metronomeBpmOverride && metronomeBpmOverride.songId === id
+            ? metronomeBpmOverride.bpm
+            : initialMetronomeBpm;
     const chordTimeline = useMemo(() => normalizeChordTimeline(analysis.chordEvents), [analysis.chordEvents]);
     const progress = duration > 0 ? Math.max(0, Math.min((currentTime / duration) * 100, 100)) : 0;
     const { currentChord, nextChord } = useMemo(
@@ -620,6 +651,94 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
         });
     };
 
+    const loadMetronomeBuffer = useCallback(async () => {
+        if (metronomeBufferRef.current) {
+            return metronomeBufferRef.current;
+        }
+
+        const AudioContextCtor = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+        if (!AudioContextCtor) {
+            throw new Error("Web Audio is unavailable in this browser.");
+        }
+
+        const context = metronomeAudioContextRef.current ?? new AudioContextCtor();
+        metronomeAudioContextRef.current = context;
+
+        const response = await fetch("/metronomes/Perc_MetronomeQuartz_lo.wav");
+        if (!response.ok) {
+            throw new Error("Metronome sound could not be loaded.");
+        }
+
+        const arrayBuffer = await response.arrayBuffer();
+        const buffer = await context.decodeAudioData(arrayBuffer.slice(0));
+        metronomeBufferRef.current = buffer;
+        return buffer;
+    }, []);
+
+    const playMetronomeClick = useCallback(async () => {
+        const buffer = await loadMetronomeBuffer();
+        const context = metronomeAudioContextRef.current;
+        if (!context) {
+            return;
+        }
+
+        if (context.state === "suspended") {
+            await context.resume();
+        }
+
+        const source = context.createBufferSource();
+        const gainNode = context.createGain();
+        source.buffer = buffer;
+        gainNode.gain.value = 0.85;
+        source.connect(gainNode);
+        gainNode.connect(context.destination);
+        source.start();
+    }, [loadMetronomeBuffer]);
+
+    useEffect(() => {
+        if (!metronomeEnabled || metronomeBpm <= 0) {
+            if (metronomeIntervalRef.current !== null) {
+                window.clearInterval(metronomeIntervalRef.current);
+                metronomeIntervalRef.current = null;
+            }
+            return;
+        }
+
+        let cancelled = false;
+        const intervalMs = Math.max(120, Math.round((60_000 / metronomeBpm)));
+
+        void playMetronomeClick().catch(() => undefined);
+
+        metronomeIntervalRef.current = window.setInterval(() => {
+            if (cancelled) {
+                return;
+            }
+
+            void playMetronomeClick().catch(() => undefined);
+        }, intervalMs);
+
+        return () => {
+            cancelled = true;
+            if (metronomeIntervalRef.current !== null) {
+                window.clearInterval(metronomeIntervalRef.current);
+                metronomeIntervalRef.current = null;
+            }
+        };
+    }, [metronomeBpm, metronomeEnabled, playMetronomeClick]);
+
+    useEffect(() => {
+        return () => {
+            if (metronomeIntervalRef.current !== null) {
+                window.clearInterval(metronomeIntervalRef.current);
+            }
+
+            if (metronomeAudioContextRef.current) {
+                void metronomeAudioContextRef.current.close();
+                metronomeAudioContextRef.current = null;
+            }
+        };
+    }, []);
+
     useEffect(() => {
         if (!loopMode || !loopRange || !isPlaying) {
             return;
@@ -745,16 +864,33 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
                                         layerConfigs={normalizedLayerConfigs}
                                         layersOpen={layersOpen}
                                         loopMode={loopMode}
+                                        metronomeBpm={metronomeBpm}
+                                        metronomeEnabled={metronomeEnabled}
+                                        metronomeOpen={metronomeOpen}
                                         noteDisplayMode={noteDisplayMode}
                                         onAddLayer={addLayer}
                                         onDecreaseTempo={() => updatePlaybackRate(playbackRate - 0.1)}
                                         onIncreaseTempo={() => updatePlaybackRate(playbackRate + 0.1)}
                                         onLayerColorChange={(slot, color) => updateLayerConfig(slot, "color", color)}
                                         onLayerKindChange={(slot, kind) => updateLayerConfig(slot, "kind", kind)}
+                                        onDecreaseMetronomeBpm={() =>
+                                            setMetronomeBpmOverride({
+                                                songId: id,
+                                                bpm: Math.max(30, metronomeBpm - 1),
+                                            })
+                                        }
                                         onRemoveLayer={removeLayer}
                                         onTempoDisplayModeChange={setTempoDisplayMode}
+                                        onIncreaseMetronomeBpm={() =>
+                                            setMetronomeBpmOverride({
+                                                songId: id,
+                                                bpm: Math.min(260, metronomeBpm + 1),
+                                            })
+                                        }
                                         onToggleLayersOpen={() => setLayersOpen((current) => !current)}
                                         onToggleLoopMode={toggleLoopMode}
+                                        onToggleMetronome={() => setMetronomeEnabled((current) => !current)}
+                                        onToggleMetronomeOpen={() => setMetronomeOpen((current) => !current)}
                                         onToggleNoteDisplayMode={() =>
                                             setNoteDisplayMode((currentMode) =>
                                                 currentMode === "notes" ? "intervals" : "notes"

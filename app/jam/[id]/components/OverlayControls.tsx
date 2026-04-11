@@ -12,16 +12,23 @@ type OverlayControlsProps = {
     layerConfigs: LayerConfig[];
     layersOpen: boolean;
     loopMode: boolean;
+    metronomeBpm: number;
+    metronomeEnabled: boolean;
+    metronomeOpen: boolean;
     noteDisplayMode: NoteDisplayMode;
     onAddLayer: () => void;
     onDecreaseTempo: () => void;
     onIncreaseTempo: () => void;
     onLayerColorChange: (slot: LayerSlot, color: string) => void;
     onLayerKindChange: (slot: LayerSlot, kind: LayerConfig["kind"]) => void;
+    onDecreaseMetronomeBpm: () => void;
     onRemoveLayer: (slot: LayerSlot) => void;
     onTempoDisplayModeChange: (mode: "percent" | "bpm") => void;
+    onIncreaseMetronomeBpm: () => void;
     onToggleLayersOpen: () => void;
     onToggleLoopMode: () => void;
+    onToggleMetronome: () => void;
+    onToggleMetronomeOpen: () => void;
     onToggleNoteDisplayMode: () => void;
     playbackRate: number;
     tempoDisplayMode: "percent" | "bpm";
@@ -249,39 +256,68 @@ function ControlCenterStatus({
 
 function ControlButtonGrid({
     loopMode,
+    metronomeBpm,
+    metronomeEnabled,
+    metronomeOpen,
     noteDisplayMode,
+    onDecreaseMetronomeBpm,
+    onIncreaseMetronomeBpm,
+    onToggleMetronome,
+    onToggleMetronomeOpen,
     onToggleLoopMode,
     onToggleNoteDisplayMode,
 }: {
     loopMode: boolean;
+    metronomeBpm: number;
+    metronomeEnabled: boolean;
+    metronomeOpen: boolean;
     noteDisplayMode: NoteDisplayMode;
+    onDecreaseMetronomeBpm: () => void;
+    onIncreaseMetronomeBpm: () => void;
+    onToggleMetronome: () => void;
+    onToggleMetronomeOpen: () => void;
     onToggleLoopMode: () => void;
     onToggleNoteDisplayMode: () => void;
 }) {
+    const actionButtonClass =
+        "box-border flex size-10 min-h-10 min-w-10 max-h-10 max-w-10 aspect-square items-center justify-center rounded-md border-2 bg-black text-[8px] font-semibold uppercase tracking-[0.04em] transition";
     const buttonItems = [
         {
             short: noteDisplayMode === "notes" ? "NTS" : "INT",
-            label: noteDisplayMode === "notes" ? "Show Intervals" : "Show Notes",
+            label: noteDisplayMode === "notes" ? "Intervals" : "Notes",
             onClick: onToggleNoteDisplayMode,
+            slotClassName: "col-start-1 row-start-1",
         },
-        { short: "STM", label: "Stems" },
-        { short: "LOP", label: loopMode ? "Loop On" : "Loop Features", onClick: onToggleLoopMode, active: loopMode },
+        {
+            short: "MET",
+            label: metronomeEnabled ? "Met On" : "Metronome",
+            onClick: onToggleMetronomeOpen,
+            active: metronomeOpen || metronomeEnabled,
+            slotClassName: "col-start-2 row-start-1",
+        },
+        {
+            short: "LOP",
+            label: loopMode ? "Loop On" : "Looper",
+            onClick: onToggleLoopMode,
+            active: loopMode,
+            slotClassName: "col-start-3 row-start-1",
+        },
     ];
 
     return (
         <div className="relative">
-            <div className="grid h-[112px] w-full grid-cols-3 content-start justify-items-center gap-y-4 py-1">
+            <div className="grid h-[112px] w-full grid-cols-3 grid-rows-2 justify-items-center gap-y-4 py-1">
                 {buttonItems.map((item) => (
                     <div
                         key={item.label}
-                        className="flex flex-col items-center gap-1"
+                        className={`flex w-[60px] flex-col items-center gap-1 ${item.slotClassName ?? ""}`}
                     >
                         <button
                             type="button"
                             onClick={item.onClick}
-                            className={`h-9 w-9 rounded-md border-2 bg-black px-1 text-[8px] font-semibold uppercase tracking-[0.04em] transition ${
+                            className={`${actionButtonClass} ${
                                 item.active
-                                    ? "border-sky-200 text-white shadow-[0_0_0_2px_rgba(186,230,253,0.55),0_0_18px_rgba(125,211,252,0.4)]"
+                                    ? "border-sky-200 text-white shadow-[0_0_0_2px_rgba(255,255,255,0.4),0_0_14px_rgba(255,255,255,0.28)]"
                                     : "border-white text-white shadow-[0_0_0_2px_rgba(255,255,255,0.4),0_0_14px_rgba(255,255,255,0.28)] hover:border-white hover:text-white hover:shadow-[0_0_0_2px_rgba(255,255,255,0.65),0_0_18px_rgba(255,255,255,0.42)]"
                             }`}
                         >
@@ -293,6 +329,45 @@ function ControlButtonGrid({
                     </div>
                 ))}
             </div>
+
+            {metronomeOpen && (
+                <div className="absolute left-0 top-[calc(100%+8px)] z-40 w-[180px] rounded-xl border border-white/12 bg-[#111111] p-3 shadow-[0_18px_40px_rgba(0,0,0,0.42)]">
+                    <div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-white/50">
+                        Practice Metronome
+                    </div>
+                    <div className="mb-3 flex items-center justify-between rounded-lg border border-white/10 bg-black/40 px-3 py-2">
+                        <div className="text-[11px] uppercase tracking-[0.12em] text-white/60">BPM</div>
+                        <div className="text-lg font-bold text-white">{metronomeBpm}</div>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2">
+                        <button
+                            type="button"
+                            onClick={onDecreaseMetronomeBpm}
+                            className="rounded-md border border-white/14 bg-black px-2 py-2 text-sm font-semibold text-white transition hover:bg-white hover:text-black"
+                        >
+                            -
+                        </button>
+                        <button
+                            type="button"
+                            onClick={onToggleMetronome}
+                            className={`rounded-md border px-2 py-2 text-[11px] font-semibold uppercase tracking-[0.08em] transition ${
+                                metronomeEnabled
+                                    ? "border-sky-200 bg-sky-100 text-black"
+                                    : "border-white/14 bg-black text-white hover:bg-white hover:text-black"
+                            }`}
+                        >
+                            {metronomeEnabled ? "Stop" : "Start"}
+                        </button>
+                        <button
+                            type="button"
+                            onClick={onIncreaseMetronomeBpm}
+                            className="rounded-md border border-white/14 bg-black px-2 py-2 text-sm font-semibold text-white transition hover:bg-white hover:text-black"
+                        >
+                            +
+                        </button>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
@@ -304,16 +379,23 @@ export default function OverlayControls({
     layerConfigs,
     layersOpen,
     loopMode,
+    metronomeBpm,
+    metronomeEnabled,
+    metronomeOpen,
     noteDisplayMode,
     onAddLayer,
     onDecreaseTempo,
     onIncreaseTempo,
     onLayerColorChange,
     onLayerKindChange,
+    onDecreaseMetronomeBpm,
     onRemoveLayer,
     onTempoDisplayModeChange,
+    onIncreaseMetronomeBpm,
     onToggleLayersOpen,
     onToggleLoopMode,
+    onToggleMetronome,
+    onToggleMetronomeOpen,
     onToggleNoteDisplayMode,
     playbackRate,
     tempoDisplayMode,
@@ -365,7 +447,14 @@ export default function OverlayControls({
                     <div className="flex flex-col justify-start gap-2">
                         <ControlButtonGrid
                             loopMode={loopMode}
+                            metronomeBpm={metronomeBpm}
+                            metronomeEnabled={metronomeEnabled}
+                            metronomeOpen={metronomeOpen}
                             noteDisplayMode={noteDisplayMode}
+                            onDecreaseMetronomeBpm={onDecreaseMetronomeBpm}
+                            onIncreaseMetronomeBpm={onIncreaseMetronomeBpm}
+                            onToggleMetronome={onToggleMetronome}
+                            onToggleMetronomeOpen={onToggleMetronomeOpen}
                             onToggleLoopMode={onToggleLoopMode}
                             onToggleNoteDisplayMode={onToggleNoteDisplayMode}
                         />

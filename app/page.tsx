@@ -84,6 +84,69 @@ export default function Home() {
     }
   };
 
+  const updateSong = (songId: string, patch: Partial<Song>) => {
+    const updatedSongs = songs.map((song) =>
+      song.id === songId
+        ? {
+            ...song,
+            ...patch,
+          }
+        : song
+    );
+
+    setSongs(updatedSongs);
+    writeSongs(updatedSongs);
+    setOpenMenuIndex(null);
+    setMenuPosition(null);
+  };
+
+  const getOpenSong = () => (openMenuIndex === null ? null : songs[openMenuIndex] ?? null);
+
+  const handleRenameSong = () => {
+    const openSong = getOpenSong();
+    if (!openSong) return;
+
+    const nextName = window.prompt("Rename song", openSong.name);
+    if (nextName === null) return;
+
+    const trimmedName = nextName.trim();
+    if (!trimmedName) return;
+
+    updateSong(openSong.id, { name: trimmedName });
+  };
+
+  const handleAdjustBpm = () => {
+    const openSong = getOpenSong();
+    if (!openSong) return;
+
+    const nextBpm = window.prompt("Set BPM", openSong.bpm === "--" ? "" : String(openSong.bpm));
+    if (nextBpm === null) return;
+
+    const trimmedBpm = nextBpm.trim();
+    if (!trimmedBpm) {
+      updateSong(openSong.id, { bpm: "--" });
+      return;
+    }
+
+    const parsedBpm = Number(trimmedBpm);
+    if (!Number.isFinite(parsedBpm) || parsedBpm <= 0) {
+      window.alert("Enter a valid BPM number.");
+      return;
+    }
+
+    updateSong(openSong.id, { bpm: Math.round(parsedBpm) });
+  };
+
+  const handleChangeKey = () => {
+    const openSong = getOpenSong();
+    if (!openSong) return;
+
+    const nextKey = window.prompt("Set key", openSong.key);
+    if (nextKey === null) return;
+
+    updateSong(openSong.id, { key: nextKey.trim() || "Unknown" });
+  };
+
   return (
     <main className="relative h-screen overflow-hidden bg-black px-6 py-4 text-white">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.04),transparent_22%),linear-gradient(180deg,rgba(0,0,0,0.98)_0%,rgba(0,0,0,1)_100%),repeating-radial-gradient(circle_at_center,rgba(255,255,255,0.018)_0_1px,transparent_1px_4px)] opacity-95" />
@@ -222,15 +285,27 @@ export default function Home() {
         >
           <div className="mb-2 px-2 text-xs text-white/45">Song Settings</div>
 
-          <button type="button" className="w-full rounded px-2 py-2 text-left text-sm text-white/78 hover:bg-white/10">
+          <button
+            type="button"
+            onClick={handleRenameSong}
+            className="w-full rounded px-2 py-2 text-left text-sm text-white/78 hover:bg-white/10"
+          >
             Rename Song
           </button>
 
-          <button type="button" className="w-full rounded px-2 py-2 text-left text-sm text-white/78 hover:bg-white/10">
+          <button
+            type="button"
+            onClick={handleAdjustBpm}
+            className="w-full rounded px-2 py-2 text-left text-sm text-white/78 hover:bg-white/10"
+          >
             Adjust BPM
           </button>
 
-          <button type="button" className="w-full rounded px-2 py-2 text-left text-sm text-white/78 hover:bg-white/10">
+          <button
+            type="button"
+            onClick={handleChangeKey}
+            className="w-full rounded px-2 py-2 text-left text-sm text-white/78 hover:bg-white/10"
+          >
             Change Key
           </button>
 
