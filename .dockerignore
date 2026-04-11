@@ -1,0 +1,15 @@
+.git
+.next
+node_modules
+.vercel
+coverage
+out
+analysis-service
+scripts/__pycache__
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.pyc
+*.pyo
+*.pyd
+*.tsbuildinfo
