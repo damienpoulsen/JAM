@@ -28,4 +28,5 @@ Example:
 
 ```env
 ANALYSIS_API_URL=https://your-analysis-service.example.com
+NEXT_PUBLIC_ANALYSIS_API_URL=https://your-analysis-service.example.com
 ```

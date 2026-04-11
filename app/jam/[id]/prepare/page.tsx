@@ -13,6 +13,8 @@ import {
 } from "../../../../lib/analysis";
 import { readSongs, type Song, writeSongs } from "../../../../lib/songs";
 
+const PUBLIC_ANALYSIS_API_URL = process.env.NEXT_PUBLIC_ANALYSIS_API_URL?.replace(/\/$/, "") ?? "";
+
 function updateStoredSong(songId: string, patch: Partial<Song>) {
   const songs = readSongs();
   const songIndex = songs.findIndex((song) => song.id === songId);
@@ -99,13 +101,26 @@ export default function PrepareJamPage({ params }: { params: Promise<{ id: strin
         formData.append("detectChords", "true");
         formData.append("skipBpm", "false");
 
-        const response = await fetch("/api/analyze-song", {
+        const analysisEndpoint = PUBLIC_ANALYSIS_API_URL
+          ? `${PUBLIC_ANALYSIS_API_URL}/analyze`
+          : "/api/analyze-song";
+
+        const response = await fetch(analysisEndpoint, {
           method: "POST",
           body: formData,
         });
 
         if (!response.ok) {
-          throw new Error("Song analysis failed.");
+          let errorMessage = "Song analysis failed.";
+
+          try {
+            const errorPayload = (await response.json()) as { detail?: string; error?: string };
+            errorMessage = errorPayload.detail || errorPayload.error || errorMessage;
+          } catch {
+            // keep fallback message
+          }
+
+          throw new Error(errorMessage);
         }
 
         const detectedAnalysis = (await response.json()) as SongAnalysis;
