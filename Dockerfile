@@ -31,7 +31,7 @@ EXPOSE 10000
 # Start the analysis service in the background, wait for it to be ready,
 # then start Next.js. The analysis server binds to 8001 to avoid conflicts.
 CMD ["sh", "-c", "\
-  uvicorn app:app --app-dir /app/analysis-service --host 0.0.0.0 --port 8001 & \
+  uvicorn app:app --app-dir /app/analysis-service --host 0.0.0.0 --port 8001 --workers 4 & \
   ANALYSIS_PID=$! && \
   echo 'Waiting for analysis service...' && \
   until curl -sf http://localhost:8001/health > /dev/null 2>&1; do sleep 2; done && \
