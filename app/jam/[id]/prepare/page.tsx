@@ -110,6 +110,14 @@ export default function PrepareJamPage({ params }: { params: Promise<{ id: strin
         });
 
         if (!response.ok) {
+          if (response.status === 503 || response.status === 429) {
+            throw new Error("The server is busy right now. Wait a moment and try again.");
+          }
+
+          if (response.status >= 500) {
+            throw new Error("Analysis is unavailable right now. Try again in a moment.");
+          }
+
           let errorMessage = "Song analysis failed.";
 
           try {
@@ -218,16 +226,69 @@ export default function PrepareJamPage({ params }: { params: Promise<{ id: strin
                 <p className="mx-auto mb-6 max-w-md text-sm" style={{ color: "rgba(237,232,245,0.55)" }}>
                   {errorMessage}
                 </p>
-                <Link
-                  href={`/jam/${id}`}
-                  className="inline-flex rounded-xl px-5 py-3 text-sm font-medium text-white transition"
-                  style={{
-                    background: "rgba(157,80,255,0.12)",
-                    border: "1px solid rgba(255,255,255,0.18)",
-                  }}
-                >
-                  Open Jam Anyway
-                </Link>
+                <div className="flex flex-col items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setErrorMessage("");
+                      hasStartedRef.current = false;
+                      updateStoredSong(id, { analysisStatus: "pending" });
+                      void (async () => {
+                        hasStartedRef.current = true;
+                        const song = readSongs().find((entry) => entry.id === id);
+                        if (!song) { setErrorMessage("This track could not be found."); return; }
+                        updateStoredSong(id, { analysisStatus: "loading" });
+                        try {
+                          const file = await getFile(song.fileId);
+                          if (!file) throw new Error("Audio file is unavailable for this track.");
+                          const fd = new FormData();
+                          fd.append("songId", id);
+                          fd.append("file", file);
+                          fd.append("detectChords", "true");
+                          fd.append("skipBpm", "false");
+                          const endpoint = PUBLIC_ANALYSIS_API_URL ? `${PUBLIC_ANALYSIS_API_URL}/analyze` : "/api/analyze-song";
+                          const res = await fetch(endpoint, { method: "POST", body: fd });
+                          if (!res.ok) {
+                            if (res.status === 503 || res.status === 429) throw new Error("The server is busy right now. Wait a moment and try again.");
+                            if (res.status >= 500) throw new Error("Analysis is unavailable right now. Try again in a moment.");
+                            const errPayload = await res.json().catch(() => ({})) as { detail?: string; error?: string };
+                            throw new Error(errPayload.detail || errPayload.error || "Song analysis failed.");
+                          }
+                          const detectedAnalysis = (await res.json()) as SongAnalysis;
+                          saveSongAnalysis(detectedAnalysis);
+                          updateStoredSong(id, {
+                            key: song.key === "Unknown" && detectedAnalysis.detectedKey ? detectedAnalysis.detectedKey : song.key,
+                            bpm: typeof detectedAnalysis.bpm === "number" && Number.isFinite(detectedAnalysis.bpm) ? Number(detectedAnalysis.bpm.toFixed(1)) : song.bpm,
+                            analysisStatus: "ready",
+                          });
+                          router.replace(`/jam/${id}`);
+                        } catch (err) {
+                          updateStoredSong(id, { analysisStatus: "error" });
+                          setErrorMessage(err instanceof Error ? err.message : "Failed to load this track.");
+                        }
+                      })();
+                    }}
+                    className="inline-flex rounded-xl px-5 py-3 text-sm font-medium text-white transition"
+                    style={{
+                      background: "rgba(157,80,255,0.2)",
+                      border: "1px solid rgba(157,80,255,0.4)",
+                      cursor: "pointer",
+                    }}
+                  >
+                    Try Again
+                  </button>
+                  <Link
+                    href={`/jam/${id}`}
+                    className="inline-flex rounded-xl px-5 py-3 text-sm font-medium transition"
+                    style={{
+                      background: "rgba(157,80,255,0.08)",
+                      border: "1px solid rgba(255,255,255,0.12)",
+                      color: "rgba(237,232,245,0.55)",
+                    }}
+                  >
+                    Open Jam Anyway
+                  </Link>
+                </div>
               </>
             ) : (
               <>
