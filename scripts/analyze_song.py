@@ -60,9 +60,11 @@ def normalize_lv_chord_label(label: str) -> str:
     if not quality:
         return root
 
-    quality = quality.replace("maj", "")
+    # Replace min/min7/min9 before touching maj so we don't corrupt minmaj variants
     quality = quality.replace("min", "m")
-    quality = quality.replace("/", "/")
+    # Only strip bare "maj" (plain major triad) — leave maj7, maj9, etc. intact
+    if quality == "maj":
+        quality = ""
     normalized = f"{root}{quality}"
     return normalized or root
 
@@ -206,9 +208,13 @@ def smooth_chord_segments(raw_segments: list[dict[str, Any]]) -> list[dict[str, 
 def classify_chord_quality(chord_label: str) -> str:
     lowered = chord_label.lower()
 
-    if "dim" in lowered or "o" in lowered:
+    if "dim" in lowered:
         return "dim"
-    if lowered.endswith("m") or "min" in lowered:
+    # Root is 1 char, or 2 if followed by # or b (e.g. C#, Bb)
+    root_end = 2 if len(lowered) >= 2 and lowered[1] in ("#", "b") else 1
+    quality_part = lowered[root_end:]
+    # Minor if quality starts with "m" but not "maj" (catches Cm, Cm7, Cm9, etc.)
+    if (quality_part.startswith("m") and not quality_part.startswith("maj")) or "min" in quality_part:
         return "minor"
     return "major"
 
@@ -446,6 +452,80 @@ def resolve_detected_key(chord_key: str | None, chroma_key: str | None) -> str |
     return chroma_key
 
 
+# Diatonic scale-degree → expected quality for major and minor keys.
+# Intervals are semitones above the tonic (0–11).
+_DIATONIC_MAJOR: dict[int, str] = {
+    0: "major", 2: "minor", 4: "minor",
+    5: "major", 7: "major", 9: "minor", 11: "dim",
+}
+_DIATONIC_MINOR: dict[int, str] = {
+    0: "minor", 2: "dim",  3: "major",
+    5: "minor", 7: "minor", 8: "major", 10: "major",
+    # harmonic minor additions: raised leading tone and V major
+    7: "major", 11: "dim",
+}
+
+
+def filter_chords_by_key(
+    segments: list[dict[str, Any]],
+    key: str,
+) -> list[dict[str, Any]]:
+    """Correct obvious major/minor quality errors on diatonic roots.
+
+    Only touches plain triads (no 7ths, no slash chords) where the root lands
+    on a diatonic scale degree but the quality is the wrong one. Safe to apply
+    because both the chromagram and chord-based key estimates already agreed.
+    """
+    tonic_note = key[:-1] if key.endswith("m") else key
+    mode = "minor" if key.endswith("m") else "major"
+
+    if tonic_note not in NOTE_TO_INDEX:
+        return segments
+
+    tonic_idx = NOTE_TO_INDEX[tonic_note]
+    diatonic = _DIATONIC_MAJOR if mode == "major" else _DIATONIC_MINOR
+
+    result: list[dict[str, Any]] = []
+    for segment in segments:
+        chord = segment["chord"]
+        root = extract_chord_root(chord)
+
+        if root is None:
+            result.append(segment)
+            continue
+
+        # Leave 7th/extended chords and slash chords alone — too many legitimate variations
+        if any(ch in chord for ch in ("7", "9", "11", "13", "/")):
+            result.append(segment)
+            continue
+
+        quality = classify_chord_quality(chord)
+        interval = (NOTE_TO_INDEX[root] - tonic_idx) % 12
+        expected_quality = diatonic.get(interval)
+
+        # Only correct plain major ↔ minor swaps on a diatonic root
+        if (
+            expected_quality in ("major", "minor")
+            and quality in ("major", "minor")
+            and quality != expected_quality
+        ):
+            suffix = "m" if expected_quality == "minor" else ""
+            result.append({**segment, "chord": f"{root}{suffix}"})
+        else:
+            result.append(segment)
+
+    # Re-collapse any consecutive identical chords created by the corrections
+    final: list[dict[str, Any]] = []
+    for segment in result:
+        prev = final[-1] if final else None
+        if prev and prev["chord"] == segment["chord"]:
+            prev["end_time"] = max(prev["end_time"], segment["end_time"])
+        else:
+            final.append(segment.copy())
+
+    return final
+
+
 def detect_chord_events(
     audio_path: Path,
     detect_chords: bool,
@@ -466,19 +546,19 @@ def detect_chord_events(
         return ([], None)
 
     smoothed_segments = smooth_chord_segments(results)
-    normalized_events: list[dict[str, Any]] = []
-
-    for item in smoothed_segments:
-        normalized_events.append(
-            {
-                "time": item["start_time"],
-                "chord": item["chord"],
-            }
-        )
 
     chord_key = infer_key_from_segments(smoothed_segments)
     chroma_key = detect_key_from_chromagram(audio_path)
     final_key = resolve_detected_key(chord_key, chroma_key)
+
+    # Correct obvious major/minor quality errors now that the key is known
+    if final_key is not None:
+        smoothed_segments = filter_chords_by_key(smoothed_segments, final_key)
+
+    normalized_events: list[dict[str, Any]] = [
+        {"time": item["start_time"], "chord": item["chord"]}
+        for item in smoothed_segments
+    ]
 
     return (normalized_events, final_key)
 
@@ -521,10 +601,27 @@ def score_tempo_candidate(
     if lag <= 0 or lag >= len(autocorrelation):
         return float("-inf")
 
-    autocorr_score = float(autocorrelation[lag]) / float(autocorrelation[0] + 1e-8)
-    range_bonus = 1.25 if BPM_PREFERRED_MIN <= bpm <= BPM_PREFERRED_MAX else 0.0
-    center_penalty = abs(bpm - BPM_PREFERRED_CENTER) * 0.035
-    interval_penalty = 0.0 if inter_beat_bpm is None else min(abs(bpm - inter_beat_bpm), 40.0) * 0.08
+    ac_norm = float(autocorrelation[0] + 1e-8)
+    autocorr_score = float(autocorrelation[lag]) / ac_norm
+
+    # Sub-harmonic penalty: if the half-lag (double-time) autocorr peak is nearly
+    # as strong as this candidate's peak, the true tempo is likely double this BPM.
+    # This is the main cause of half-time errors (e.g. detecting 70 when true BPM is 140).
+    half_lag = lag // 2
+    if half_lag > 0 and half_lag < len(autocorrelation):
+        double_bpm = bpm * 2.0
+        if BPM_VALID_MIN <= double_bpm <= BPM_VALID_MAX:
+            half_lag_score = float(autocorrelation[half_lag]) / ac_norm
+            excess = half_lag_score - autocorr_score * 0.75
+            if excess > 0:
+                autocorr_score -= excess * 2.5
+
+    # Soft genre-range preference — reduced from 1.25 to avoid overriding real signal.
+    range_bonus = 0.6 if BPM_PREFERRED_MIN <= bpm <= BPM_PREFERRED_MAX else 0.0
+    # Very soft center pull — was 0.035, that was too aggressive and dragged everything to 118.
+    center_penalty = abs(bpm - BPM_PREFERRED_CENTER) * 0.008
+    # Stronger weight on measured beat intervals — was 0.08, now 0.18.
+    interval_penalty = 0.0 if inter_beat_bpm is None else min(abs(bpm - inter_beat_bpm), 40.0) * 0.18
 
     beat_grid = np.arange(0, len(onset_envelope), frames_per_beat)
     beat_indices = np.clip(np.round(beat_grid).astype(int), 0, len(onset_envelope) - 1)
@@ -533,7 +630,7 @@ def score_tempo_candidate(
     baseline_energy = float(np.mean(onset_envelope)) + 1e-8
     grid_score = grid_energy / baseline_energy
 
-    return autocorr_score * 5.0 + grid_score * 2.2 + range_bonus - center_penalty - interval_penalty
+    return autocorr_score * 5.0 + grid_score * 3.0 + range_bonus - center_penalty - interval_penalty
 
 
 def infer_beat_start_time(
@@ -591,12 +688,25 @@ def infer_beat_start_time(
 def analyze_bpm_and_beats(audio_path: Path) -> tuple[float | None, float | None]:
     signal, sample_rate = librosa.load(audio_path, sr=None, mono=True)
     _, percussive = librosa.effects.hpss(signal)
-    onset_envelope = librosa.onset.onset_strength(
+
+    # Percussive onset: strong for drums/transients
+    onset_percussive = librosa.onset.onset_strength(
         y=percussive,
         sr=sample_rate,
         hop_length=BPM_HOP_LENGTH,
         aggregate=np.median,
     )
+    # Full-signal onset: catches melody and harmony beats when percussion is weak
+    onset_full = librosa.onset.onset_strength(
+        y=signal,
+        sr=sample_rate,
+        hop_length=BPM_HOP_LENGTH,
+        aggregate=np.median,
+    )
+    # Blend: percussive-dominant but full-signal fills in melodic content
+    min_len = min(len(onset_percussive), len(onset_full))
+    onset_envelope = 0.65 * onset_percussive[:min_len] + 0.35 * onset_full[:min_len]
+
     tempo, beat_frames = librosa.beat.beat_track(
         onset_envelope=onset_envelope,
         sr=sample_rate,
@@ -622,6 +732,23 @@ def analyze_bpm_and_beats(audio_path: Path) -> tuple[float | None, float | None]
             aggregate=None,
         )
         raw_tempi.extend(float(value) for value in np.asarray(dynamic_tempi).flatten() if np.isfinite(value))
+    except Exception:
+        pass
+
+    # PLP (Predominant Local Pulse): uses a different algorithm than beat_track and
+    # is more robust to syncopation and off-beat rhythms. Good independent second opinion.
+    try:
+        pulse = librosa.beat.plp(
+            onset_envelope=onset_envelope,
+            sr=sample_rate,
+            hop_length=BPM_HOP_LENGTH,
+        )
+        plp_tempi = librosa.feature.tempo(
+            onset_envelope=pulse,
+            sr=sample_rate,
+            hop_length=BPM_HOP_LENGTH,
+        )
+        raw_tempi.extend(float(v) for v in np.asarray(plp_tempi).flatten() if np.isfinite(v))
     except Exception:
         pass
 
