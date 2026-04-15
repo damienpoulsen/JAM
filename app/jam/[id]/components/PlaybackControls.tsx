@@ -3,6 +3,8 @@
 import type { MouseEvent as ReactMouseEvent } from "react";
 
 type PlaybackControlsProps = {
+    barColor: string;
+    contentColor: string;
     currentTime: number;
     duration: number;
     editingName: boolean;
@@ -28,6 +30,8 @@ type PlaybackControlsProps = {
 };
 
 export default function PlaybackControls({
+    barColor,
+    contentColor,
     currentTime,
     duration,
     editingName,
@@ -61,21 +65,24 @@ export default function PlaybackControls({
 
     return (
         <div className="mt-0 flex justify-center">
-            <div className="w-full max-w-[1400px] rounded-2xl bg-[#2f302d] px-10 py-4">
-                <div className="mb-4 flex items-center justify-between text-xl">
-                    <div className="min-w-0 max-w-[320px]">
+            <div className="w-full max-w-[1400px] rounded-2xl border-[1.5px] border-[#f4f4f5] px-10 pt-3 pb-8" style={{ background: barColor, color: contentColor }}>
+                <div className="mb-2 flex items-center text-xl">
+                    <div className="w-[200px] shrink-0 min-w-0">
                         {!editingName ? (
                             <button
                                 type="button"
                                 onContextMenu={onNameContextMenu}
-                                className="block max-w-full cursor-pointer truncate select-none"
+                                className="block w-full cursor-pointer truncate select-none text-left"
+                                title={songName}
+                                style={{ fontFamily: "'Rajdhani', sans-serif", letterSpacing: "0.03em" }}
                             >
                                 {songName}
                             </button>
                         ) : (
                             <input
                                 autoFocus
-                                className="w-full border-b border-white bg-transparent outline-none"
+                                className="w-full border-b bg-transparent outline-none"
+                                style={{ borderColor: contentColor }}
                                 value={songName}
                                 onChange={(event) => onNameChange(event.target.value)}
                                 onBlur={onNameBlur}
@@ -96,12 +103,12 @@ export default function PlaybackControls({
                         <button type="button">⏭</button>
                     </div>
 
-                    <div className="relative ml-8 flex w-[112px] justify-end">
+                    <div className="relative flex w-[200px] shrink-0 justify-end">
                         <button
                             type="button"
                             onClick={onToggleVolumeOpen}
                             aria-label="Volume"
-                            className="flex h-10 w-10 items-center justify-center text-white transition hover:text-white/75"
+                            className="flex h-10 w-10 items-center justify-center transition opacity-90 hover:opacity-60"
                         >
                             <svg
                                 aria-hidden="true"
@@ -119,6 +126,9 @@ export default function PlaybackControls({
                             </svg>
                         </button>
 
+                        {volumeOpen && (
+                            <div className="fixed inset-0 z-40" onClick={onToggleVolumeOpen} />
+                        )}
                         {volumeOpen && (
                             <div className="absolute right-0 top-[calc(100%+10px)] z-50 w-[220px] rounded-xl border border-white/10 bg-[#12121a] p-3 shadow-[0_16px_50px_rgba(0,0,0,0.45)]">
                                 <div className="mb-2 flex items-center justify-between text-[11px] uppercase tracking-[0.14em] text-white/68">
@@ -139,15 +149,12 @@ export default function PlaybackControls({
                     </div>
                 </div>
 
-                <div className="mb-4 flex justify-between text-base">
-                    <span>{formatTime(currentTime)}</span>
-                    <span>{formatTime(duration)}</span>
-                </div>
-
-                <div className="relative flex justify-center">
+                <div className="mt-8 flex items-center gap-3">
+                    <span className="w-10 shrink-0 text-right text-sm">{formatTime(currentTime)}</span>
+                    <div className="relative flex-1">
                     {loopMode && (
                         <div
-                            className="absolute -top-7 h-[20px] w-[80%] cursor-crosshair rounded-xl border border-white/14 bg-[#191922]"
+                            className="absolute -top-7 h-[20px] w-full cursor-crosshair rounded-xl border border-white/14 bg-[#191922]"
                             onMouseDown={onLoopLaneMouseDown}
                         >
                             <div className="pointer-events-none absolute inset-x-3 top-1/2 h-[2px] -translate-y-1/2 rounded-full bg-white/12" />
@@ -217,7 +224,7 @@ export default function PlaybackControls({
                     )}
 
                     <div
-                        className={`relative h-[16px] w-[80%] rounded-full bg-[#3a3a40] ${isAudioAvailable ? "cursor-pointer" : "cursor-not-allowed opacity-60"}`}
+                        className={`relative h-[16px] w-full rounded-full bg-[#3a3a40] ${isAudioAvailable ? "cursor-pointer" : "cursor-not-allowed opacity-60"}`}
                         onMouseDown={onTimelineMouseDown}
                     >
                         {visibleLoopRange && (
@@ -251,20 +258,24 @@ export default function PlaybackControls({
                         )}
 
                         <div
-                            className="relative h-full rounded-full bg-white"
+                            className="relative h-full rounded-full"
                             style={{
                                 width: `${progress}%`,
+                                backgroundColor: contentColor,
                             }}
                         />
 
                         <div
-                            className="absolute top-1/2 h-9 w-9 rounded-full bg-white"
+                            className="absolute top-1/2 h-9 w-9 rounded-full"
                             style={{
                                 left: `${progress}%`,
                                 transform: "translate(-50%, -50%)",
+                                backgroundColor: contentColor,
                             }}
                         />
                     </div>
+                    </div>
+                    <span className="w-10 shrink-0 text-sm">{formatTime(duration)}</span>
                 </div>
             </div>
         </div>

@@ -261,7 +261,7 @@ def infer_key_from_segments(segments: list[dict[str, Any]]) -> str | None:
             tonic_duration = 0.0
             dominant_duration = 0.0
             tonic_quality = "major" if mode == "major" else "minor"
-            dominant_quality = "major" if mode == "major" else "major"
+            dominant_quality = "major"
             subdominant_quality = "major" if mode == "major" else "minor"
 
             for segment in segments:
@@ -294,6 +294,45 @@ def infer_key_from_segments(segments: list[dict[str, Any]]) -> str | None:
                     score += 0.6 * duration
                 if mode == "minor" and interval in {3, 8} and quality == "major":
                     score += 0.7 * duration
+
+            # ── Cadence detection (V→I, IV→I, ii→V→I) ──────────────────────
+            # These progressions are strong tonal anchors that confirm the tonic.
+            # Critically important for distinguishing I from IV (e.g. C maj vs F maj).
+            for idx in range(len(segments) - 1):
+                curr_root = extract_chord_root(segments[idx]["chord"])
+                next_root = extract_chord_root(segments[idx + 1]["chord"])
+                if curr_root is None or next_root is None:
+                    continue
+
+                curr_interval = (NOTE_TO_INDEX[curr_root] - tonic_index) % 12
+                next_interval = (NOTE_TO_INDEX[next_root] - tonic_index) % 12
+                curr_quality = classify_chord_quality(segments[idx]["chord"])
+                next_quality = classify_chord_quality(segments[idx + 1]["chord"])
+
+                # Authentic cadence: V(maj) → I
+                if curr_interval == 7 and curr_quality == "major" and next_interval == 0 and next_quality == tonic_quality:
+                    score += 4.5
+
+                # Plagal cadence: IV → I
+                if curr_interval == 5 and next_interval == 0 and next_quality == tonic_quality:
+                    score += 1.8
+
+                # ii → V (half cadence setup — strong ii–V–I pull)
+                if curr_interval == 2 and curr_quality == "minor" and next_interval == 7 and next_quality == "major":
+                    score += 2.0
+
+                # Three-chord resolution: ii → V → I
+                if idx + 2 < len(segments):
+                    next2_root = extract_chord_root(segments[idx + 2]["chord"])
+                    if next2_root is not None:
+                        next2_interval = (NOTE_TO_INDEX[next2_root] - tonic_index) % 12
+                        next2_quality = classify_chord_quality(segments[idx + 2]["chord"])
+                        if (
+                            curr_interval == 2 and curr_quality == "minor"
+                            and next_interval == 7 and next_quality == "major"
+                            and next2_interval == 0 and next2_quality == tonic_quality
+                        ):
+                            score += 6.0
 
             first_root = extract_chord_root(first_segment["chord"])
             last_root = extract_chord_root(last_segment["chord"])
@@ -329,6 +368,84 @@ def infer_key_from_segments(segments: list[dict[str, Any]]) -> str | None:
     return best_key
 
 
+# Krumhansl-Schmuckler tonal hierarchy profiles (major and minor)
+_KS_MAJOR = np.array([6.35, 2.23, 3.48, 2.33, 4.38, 4.09, 2.52, 5.19, 2.39, 3.66, 2.29, 2.88])
+_KS_MINOR = np.array([6.33, 2.68, 3.52, 5.38, 2.60, 3.53, 2.54, 4.75, 3.98, 2.69, 3.34, 3.17])
+
+
+def detect_key_from_chromagram(audio_path: Path) -> str | None:
+    """Independent key detection using pitch-class chromagram + K-S profiles.
+
+    This runs directly on the raw audio and is unaffected by chord detector
+    errors, making it a reliable cross-check against infer_key_from_segments.
+    """
+    try:
+        signal, sample_rate = librosa.load(audio_path, sr=22050, mono=True)
+        harmonic = librosa.effects.harmonic(signal, margin=4)
+        chroma = librosa.feature.chroma_cqt(y=harmonic, sr=sample_rate, bins_per_octave=36)
+        chroma_mean = np.mean(chroma, axis=1)  # 12-element pitch-class profile
+
+        best_key: str | None = None
+        best_corr = float("-inf")
+
+        for i, note in enumerate(INDEX_TO_NOTE):
+            major_corr = float(np.corrcoef(chroma_mean, np.roll(_KS_MAJOR, i))[0, 1])
+            minor_corr = float(np.corrcoef(chroma_mean, np.roll(_KS_MINOR, i))[0, 1])
+
+            if major_corr > best_corr:
+                best_corr = major_corr
+                best_key = note
+            if minor_corr > best_corr:
+                best_corr = minor_corr
+                best_key = f"{note}m"
+
+        return best_key
+    except Exception:
+        return None
+
+
+def _key_to_tonic_and_mode(key: str) -> tuple[int, str]:
+    if key.endswith("m"):
+        note = key[:-1]
+        return NOTE_TO_INDEX.get(note, -1), "minor"
+    return NOTE_TO_INDEX.get(key, -1), "major"
+
+
+def resolve_detected_key(chord_key: str | None, chroma_key: str | None) -> str | None:
+    """Reconcile chord-based and chromagram-based key estimates.
+
+    - Agreement → confident, return that key.
+    - Relative-key confusion (e.g. C maj vs A min) → trust chord-based
+      since cadence structure distinguishes these better than pitch profiles.
+    - All other disagreements → trust chromagram; it's independent of chord
+      detector errors and reliably catches subdominant-as-tonic mistakes
+      (e.g. detecting F maj when the song is in C maj).
+    """
+    if chord_key is None and chroma_key is None:
+        return None
+    if chord_key is None:
+        return chroma_key
+    if chroma_key is None:
+        return chord_key
+    if chord_key == chroma_key:
+        return chord_key
+
+    chord_idx, chord_mode = _key_to_tonic_and_mode(chord_key)
+    chroma_idx, chroma_mode = _key_to_tonic_and_mode(chroma_key)
+
+    # Relative key pair: major tonic is minor tonic + 3 semitones
+    # e.g. C major (0) and A minor (9) → (9 + 3) % 12 == 0
+    if chord_mode == "major" and chroma_mode == "minor":
+        if chord_idx == (chroma_idx + 3) % 12:
+            return chord_key  # cadence structure is better for maj/min distinction
+    if chord_mode == "minor" and chroma_mode == "major":
+        if chroma_idx == (chord_idx + 3) % 12:
+            return chord_key  # same reason — keep chord-based judgment
+
+    # Genuine disagreement (e.g. C maj vs F maj) — chromagram wins
+    return chroma_key
+
+
 def detect_chord_events(
     audio_path: Path,
     detect_chords: bool,
@@ -359,7 +476,11 @@ def detect_chord_events(
             }
         )
 
-    return (normalized_events, infer_key_from_segments(smoothed_segments))
+    chord_key = infer_key_from_segments(smoothed_segments)
+    chroma_key = detect_key_from_chromagram(audio_path)
+    final_key = resolve_detected_key(chord_key, chroma_key)
+
+    return (normalized_events, final_key)
 
 
 def correct_bpm(raw_bpm: float | None) -> float | None:

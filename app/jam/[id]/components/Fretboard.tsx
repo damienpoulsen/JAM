@@ -3,8 +3,21 @@
 import type { MergedNote } from "@/lib/layerManager";
 import type { Layer } from "@/lib/layers";
 
+function hexLuminance(hex: string): number {
+    const h = hex.replace("#", "");
+    if (h.length !== 6) return 0.5;
+    const r = parseInt(h.slice(0, 2), 16) / 255;
+    const g = parseInt(h.slice(2, 4), 16) / 255;
+    const b = parseInt(h.slice(4, 6), 16) / 255;
+    return 0.299 * r + 0.587 * g + 0.114 * b;
+}
+
 type FretboardProps = {
-    fretboardTheme: "light" | "dark";
+    boardColorOverride?: string;
+    stringColorOverride?: string;
+    markerColorOverride?: string;
+    labelTextColor?: "white" | "black";
+    noteTextColor?: "white" | "black";
     fretMarkers: number[];
     frets: number;
     getDisplayedFretboardLabel: (noteIndex: number) => string;
@@ -16,7 +29,11 @@ type FretboardProps = {
 };
 
 export default function Fretboard({
-    fretboardTheme,
+    boardColorOverride,
+    stringColorOverride,
+    markerColorOverride,
+    labelTextColor,
+    noteTextColor,
     fretMarkers,
     frets,
     getDisplayedFretboardLabel,
@@ -26,21 +43,23 @@ export default function Fretboard({
     tuning,
     tuningIndex,
 }: FretboardProps) {
-    const isDarkMode = fretboardTheme === "dark";
-    const boardBackground = isDarkMode ? "#0f1115" : "#f1e5cb";
-    const boardBorder = isDarkMode ? "#f4f4f5" : "#000000";
-    const boardGlow = isDarkMode
+    const boardBackground = boardColorOverride ?? "#0f1115";
+    const isDarkBoard = hexLuminance(boardBackground) < 0.45;
+    const boardBorder = isDarkBoard ? "#f4f4f5" : "#000000";
+    const boardGlow = isDarkBoard
         ? "0 18px 40px rgba(0,0,0,0.52)"
         : "0 18px 40px rgba(0,0,0,0.16)";
-    const innerGradient = isDarkMode
+    const innerGradient = isDarkBoard
         ? "linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.01))"
         : "linear-gradient(180deg,rgba(255,255,255,0.3),rgba(255,255,255,0.06))";
-    const stringColor = isDarkMode ? "#ffffff" : "#000000";
-    const markerColor = isDarkMode ? "rgba(255,255,255,0.82)" : "rgba(0,0,0,0.45)";
-    const labelColor = isDarkMode ? "rgba(255,255,255,0.86)" : "rgba(0,0,0,0.8)";
-    const openNoteFallbackFill = isDarkMode ? "#0f1115" : "#f1e5cb";
-    const openNoteFallbackText = isDarkMode ? "#f5f5f5" : "#111111";
-    const openNoteFallbackBorder = isDarkMode ? "2px solid #f5f5f5" : "2px solid #111111";
+    const stringColor = stringColorOverride ?? (isDarkBoard ? "#ffffff" : "#000000");
+    const markerColor = markerColorOverride ?? (isDarkBoard ? "rgba(255,255,255,0.82)" : "rgba(0,0,0,0.45)");
+    const effectiveLabelMode = labelTextColor ?? (isDarkBoard ? "white" : "black");
+    const labelColor = effectiveLabelMode === "white" ? "rgba(255,255,255,0.86)" : "rgba(0,0,0,0.8)";
+    const openNoteFallbackFill = boardBackground;
+    const openNoteFallbackText = isDarkBoard ? "#f5f5f5" : "#111111";
+    const openNoteFallbackBorder = isDarkBoard ? "2px solid #f5f5f5" : "2px solid #111111";
+    const effectiveNoteTextColor = noteTextColor === "black" ? "#111111" : noteTextColor === "white" ? "#ffffff" : undefined;
 
     return (
         <div className="mt-0 mb-6 flex flex-1 items-start justify-center">
@@ -70,10 +89,11 @@ export default function Fretboard({
                                         }}
                                     >
                                         <div
-                                            className="flex h-9 w-9 items-center justify-center rounded-full border-2 text-sm font-bold transition-colors"
+                                            className="flex h-9 w-9 items-center justify-center rounded-full border-2 text-base font-bold transition-colors"
                                             style={{
+                                                fontFamily: "'Rajdhani', sans-serif",
                                                 backgroundColor: openNoteData?.topLayer.style.fill ?? openNoteFallbackFill,
-                                                color: openNoteData?.topLayer.style.textColor ?? openNoteFallbackText,
+                                                color: openNoteData ? (effectiveNoteTextColor ?? openNoteData.topLayer.style.textColor) : openNoteFallbackText,
                                                 border: openNoteData
                                                     ? getLayerBorderStyle(openNoteData.layers, 2)
                                                     : openNoteFallbackBorder,
@@ -188,10 +208,11 @@ export default function Fretboard({
                                                 }}
                                             >
                                                 <div
-                                                    className="relative flex h-9 w-9 items-center justify-center rounded-full text-xs font-bold shadow-[0_0_10px_rgba(15,23,42,0.45)]"
+                                                    className="relative flex h-9 w-9 items-center justify-center rounded-full text-sm font-bold shadow-[0_0_10px_rgba(15,23,42,0.45)]"
                                                     style={{
+                                                        fontFamily: "'Rajdhani', sans-serif",
                                                         backgroundColor: noteData.topLayer.style.fill,
-                                                        color: noteData.topLayer.style.textColor,
+                                                        color: effectiveNoteTextColor ?? noteData.topLayer.style.textColor,
                                                         opacity: noteData.topLayer.style.opacity,
                                                         border: getLayerBorderStyle(
                                                             noteData.layers,

@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { use, useEffect, useRef, useState } from "react";
@@ -149,53 +148,111 @@ export default function PrepareJamPage({ params }: { params: Promise<{ id: strin
   }, [id, router]);
 
   return (
-    <main className="relative flex h-screen overflow-hidden bg-[#151313] px-6 py-4 text-white">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.05),transparent_24%),linear-gradient(180deg,rgba(35,32,32,0.96)_0%,rgba(18,16,16,0.98)_100%),repeating-radial-gradient(circle_at_center,rgba(255,255,255,0.025)_0_1px,transparent_1px_4px)] opacity-95" />
+    <>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap');
 
-      <div className="relative mx-auto flex w-full max-w-4xl flex-1 items-center justify-center">
-        <div className="w-full max-w-xl rounded-[28px] border border-white/12 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] px-8 py-10 text-center shadow-[0_24px_70px_rgba(0,0,0,0.35)] backdrop-blur-sm">
-          <div className="relative mx-auto mb-6 flex justify-center">
-            <div className="absolute inset-0 rounded-full bg-white/8 blur-3xl" />
-            <Image
-              src="/jam-logo-vibrant-1.png"
-              alt="Jam logo"
-              width={360}
-              height={200}
-              priority
-              className="relative h-auto w-[280px]"
-            />
-          </div>
+        .bar-pulse {
+          animation: bar-pulse 1.8s ease-in-out infinite;
+        }
+        @keyframes bar-pulse {
+          0%,100% { opacity: 1; width: 40%; }
+          50%      { opacity: 0.6; width: 70%; }
+        }
+      `}</style>
 
-          <div className="mb-3 text-sm uppercase tracking-[0.3em] text-white/45">Loading</div>
-          <h1 className="mb-3 text-3xl font-semibold text-white">{songName}</h1>
+      <main
+        className="relative flex h-screen overflow-hidden bg-black px-6 py-4 text-white "
+        style={{ fontFamily: "'IBM Plex Mono', monospace" }}
+      >
 
-          {errorMessage ? (
-            <>
-              <p className="mx-auto mb-6 max-w-md text-sm text-white/65">{errorMessage}</p>
-              <Link
-                href={`/jam/${id}`}
-                className="inline-flex rounded-xl border border-white/12 bg-white/8 px-5 py-3 text-sm font-medium text-white transition hover:bg-white/12"
+        {/* ── Content ── */}
+        <div className="relative mx-auto flex w-full max-w-4xl flex-1 items-center justify-center">
+          <div
+            className="w-full max-w-xl rounded-[28px] px-8 py-10 text-center"
+            style={{
+              background: "rgba(18,14,28,0.82)",
+              border: "1px solid rgba(255,255,255,0.18)",
+              boxShadow: "0 24px 70px rgba(0,0,0,0.6)",
+              backdropFilter: "blur(20px)",
+            }}
+          >
+            {/* Logo */}
+            <div className="relative mx-auto mb-6 flex justify-center">
+              <svg
+                viewBox="0 0 540 300"
+                xmlns="http://www.w3.org/2000/svg"
+                className="relative h-auto w-[220px]"
+                aria-label="JAM"
               >
-                Open Jam Anyway
-              </Link>
-            </>
-          ) : (
-            <>
-              <p className="mx-auto mb-8 max-w-md text-sm text-white/65">
-                Building BPM and chord data for your first session. This screen will jump into the jam
-                page as soon as it is ready.
-              </p>
+                <defs>
+                  <filter id="p-jam-glow" x="-20%" y="-30%" width="140%" height="160%">
+                    <feGaussianBlur in="SourceGraphic" stdDeviation="12" result="blur" />
+                    <feMerge>
+                      <feMergeNode in="blur" />
+                      <feMergeNode in="SourceGraphic" />
+                    </feMerge>
+                  </filter>
+                </defs>
+                <text x="270" y="210" fontFamily="'Chakra Petch', sans-serif" fontWeight={700} fontSize={190} fill="rgba(255,255,255,0.12)" textAnchor="middle" letterSpacing={16} filter="url(#p-jam-glow)">JAM</text>
+                <text x="270" y="210" fontFamily="'Chakra Petch', sans-serif" fontWeight={700} fontSize={190} fill="#ffffff" textAnchor="middle" letterSpacing={16}>JAM</text>
+              </svg>
+            </div>
 
-              <div className="mx-auto flex w-full max-w-[280px] items-center gap-3">
-                <div className="h-2 flex-1 overflow-hidden rounded-full bg-white/10">
-                  <div className="h-full w-1/2 animate-pulse rounded-full bg-[#f5f5f4]" />
+            <div
+              className="mb-3 text-xs uppercase"
+              style={{ letterSpacing: "0.3em", color: "rgba(237,232,245,0.35)" }}
+            >
+              Loading
+            </div>
+
+            <h1
+              className="mb-3 text-2xl font-semibold"
+              style={{ fontFamily: "'Rajdhani', sans-serif", color: "#ede8f5", letterSpacing: "0.03em" }}
+            >
+              {songName}
+            </h1>
+
+            {errorMessage ? (
+              <>
+                <p className="mx-auto mb-6 max-w-md text-sm" style={{ color: "rgba(237,232,245,0.55)" }}>
+                  {errorMessage}
+                </p>
+                <Link
+                  href={`/jam/${id}`}
+                  className="inline-flex rounded-xl px-5 py-3 text-sm font-medium text-white transition"
+                  style={{
+                    background: "rgba(157,80,255,0.12)",
+                    border: "1px solid rgba(255,255,255,0.18)",
+                  }}
+                >
+                  Open Jam Anyway
+                </Link>
+              </>
+            ) : (
+              <>
+                <p className="mx-auto mb-8 max-w-md text-sm" style={{ color: "rgba(237,232,245,0.45)" }}>
+                  Building BPM and chord data for your first session. This screen will jump into the jam
+                  page as soon as it is ready.
+                </p>
+
+                <div className="mx-auto flex w-full max-w-[280px] items-center gap-3">
+                  <div
+                    className="h-[3px] flex-1 overflow-hidden rounded-full"
+                    style={{ background: "rgba(255,255,255,0.08)" }}
+                  >
+                    <div
+                      className="bar-pulse h-full rounded-full"
+                      style={{ background: "rgba(157,80,255,0.8)" }}
+                    />
+                  </div>
+                  <span className="text-xs" style={{ color: "rgba(237,232,245,0.4)" }}>Analyzing…</span>
                 </div>
-                <span className="text-sm text-white/55">Analyzing…</span>
-              </div>
-            </>
-          )}
+              </>
+            )}
+          </div>
         </div>
-      </div>
-    </main>
+      </main>
+    </>
   );
 }
