@@ -76,47 +76,48 @@ export default function SongsPage() {
   return (
     <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@700&family=Rajdhani:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;0,800;0,900;1,400;1,700&family=Lora:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Courier+Prime:ital,wght@0,400;0,700;1,400&display=swap');
 
         .song-card {
-          transition: transform 0.15s, box-shadow 0.15s;
+          transition: transform 0.15s, box-shadow 0.15s, border-color 0.15s;
         }
         .song-card:hover {
           transform: scale(1.02);
-          box-shadow: 0 20px 60px rgba(0,0,0,0.5), 0 0 40px rgba(255,255,255,0.15) !important;
+          border-color: rgba(196,94,50,0.55) !important;
+          box-shadow: 0 12px 40px rgba(0,0,0,0.45), 0 0 20px rgba(196,94,50,0.14) !important;
         }
         .settings-btn {
           transition: background 0.15s;
         }
         .settings-btn:hover {
-          background: rgba(255,255,255,0.12) !important;
+          background: rgba(196,94,50,0.25) !important;
         }
       `}</style>
 
       <div
-        className="min-h-screen bg-black px-8 py-8 text-white"
-        style={{ fontFamily: "'IBM Plex Mono', monospace" }}
+        className="min-h-screen px-8 py-8 text-white"
+        style={{ fontFamily: "'Lora', serif", background: "#080704" }}
       >
 
         {/* Side lines */}
-        <div className="pointer-events-none fixed top-[144px] bottom-[144px] left-[10%] w-px" style={{ background: "rgba(255,255,255,0.07)" }} />
-        <div className="pointer-events-none fixed top-[144px] bottom-[144px] right-[10%] w-px" style={{ background: "rgba(255,255,255,0.07)" }} />
+        <div className="pointer-events-none fixed top-[144px] bottom-[144px] left-[10%] w-px" style={{ background: "rgba(196,94,50,0.18)" }} />
+        <div className="pointer-events-none fixed top-[144px] bottom-[144px] right-[10%] w-px" style={{ background: "rgba(196,94,50,0.18)" }} />
 
         <div className="relative mx-auto max-w-6xl">
           {/* Header */}
           <div className="mb-8 flex items-center justify-center relative">
             <h1
               className="text-5xl text-center"
-              style={{ fontFamily: "'Rajdhani', sans-serif", fontWeight: 700, letterSpacing: "0.06em" }}
+              style={{ fontFamily: "'Playfair Display', serif", fontWeight: 700, letterSpacing: "0.04em" }}
             >
               All Tracks
             </h1>
             <Link
               href="/"
               className="absolute right-0 text-sm"
-              style={{ color: "rgba(255,255,255,0.35)", transition: "color 0.15s" }}
-              onMouseEnter={e => (e.currentTarget.style.color = "#ffffff")}
-              onMouseLeave={e => (e.currentTarget.style.color = "rgba(255,255,255,0.35)")}
+              style={{ color: "rgba(220,180,140,0.45)", transition: "color 0.15s" }}
+              onMouseEnter={e => (e.currentTarget.style.color = "#C45A2A")}
+              onMouseLeave={e => (e.currentTarget.style.color = "rgba(220,180,140,0.45)")}
             >
               ← Back
             </Link>
@@ -142,9 +143,9 @@ export default function SongsPage() {
                     <div
                       className="song-card relative flex items-center gap-4 rounded-xl p-4 cursor-pointer"
                       style={{
-                        background: "rgba(157,80,255,0.10)",
-                        border: "none",
-                        boxShadow: "0 4px 20px rgba(0,0,0,0.4)",
+                        background: "rgba(196,94,50,0.08)",
+                        border: "1px solid rgba(196,94,50,0.25)",
+                        boxShadow: "0 4px 20px rgba(0,0,0,0.35)",
                       }}
                     >
                       {/* Settings button */}
@@ -157,9 +158,9 @@ export default function SongsPage() {
                         }}
                         className="settings-btn flex h-9 w-9 shrink-0 items-center justify-center rounded-md"
                         style={{
-                          background: "rgba(157,80,255,0.15)",
-                          color: "#ffffff",
-                          boxShadow: "0 0 0 1px rgba(157,80,255,0.3)",
+                          background: "rgba(196,94,50,0.15)",
+                          color: "#f0e4d0",
+                          boxShadow: "0 0 0 1px rgba(196,94,50,0.3)",
                         }}
                         aria-label={`Open settings for ${song.name}`}
                       >
@@ -173,11 +174,11 @@ export default function SongsPage() {
                       <div className="min-w-0 flex-1">
                         <div
                           className="truncate text-base font-semibold"
-                          style={{ fontFamily: "'Rajdhani', sans-serif", letterSpacing: "0.03em", color: "#ffffff" }}
+                          style={{ fontFamily: "'Lora', serif", letterSpacing: "0.02em", color: "#f5ede0" }}
                         >
                           {song.name}
                         </div>
-                        <div className="mt-1 text-xs" style={{ color: isPending ? "rgba(255,255,255,0.25)" : "rgba(255,255,255,0.55)" }}>
+                        <div className="mt-1 text-xs" style={{ color: isPending ? "rgba(220,180,140,0.25)" : "rgba(220,180,140,0.55)" }}>
                           {isPending ? "Analyzing…" : `${song.key} · ${formatTrackBpm(song.bpm)} BPM`}
                         </div>
                       </div>
@@ -192,13 +193,13 @@ export default function SongsPage() {
                     <div
                       className="absolute left-0 top-full z-50 mt-2 w-[180px] rounded-xl p-2"
                       style={{
-                        background: "rgba(10,8,18,0.97)",
-                        border: "1px solid rgba(157,80,255,0.25)",
+                        background: "rgba(12,7,3,0.97)",
+                        border: "1px solid rgba(196,94,50,0.28)",
                         boxShadow: "0 20px 50px rgba(0,0,0,0.7)",
                         backdropFilter: "blur(16px)",
                       }}
                     >
-                      <div className="mb-2 px-2 text-xs" style={{ color: "rgba(255,255,255,0.3)" }}>Song Settings</div>
+                      <div className="mb-2 px-2 text-xs" style={{ color: "rgba(220,180,140,0.45)", fontFamily: "'Lora', serif", letterSpacing: "0.08em" }}>Song Settings</div>
                       {[
                         { label: "Rename Song", onClick: handleRenameSong },
                         { label: "Adjust BPM",  onClick: handleAdjustBpm  },
@@ -209,8 +210,8 @@ export default function SongsPage() {
                           type="button"
                           onClick={onClick}
                           className="w-full rounded px-2 py-2 text-left text-sm"
-                          style={{ color: "#ffffff", background: "none", border: "none", cursor: "pointer", transition: "background 0.1s" }}
-                          onMouseEnter={e => { e.currentTarget.style.background = "rgba(157,80,255,0.12)"; }}
+                          style={{ color: "#f5ede0", fontFamily: "'Lora', serif", background: "none", border: "none", cursor: "pointer", transition: "background 0.1s" }}
+                          onMouseEnter={e => { e.currentTarget.style.background = "rgba(196,94,50,0.14)"; }}
                           onMouseLeave={e => { e.currentTarget.style.background = "none"; }}
                         >
                           {label}
@@ -235,7 +236,7 @@ export default function SongsPage() {
             {songs.length === 0 && (
               <div
                 className="col-span-3 rounded-xl px-4 py-10 text-center text-sm"
-                style={{ border: "1px dashed rgba(157,80,255,0.2)", color: "rgba(255,255,255,0.25)" }}
+                style={{ border: "1px dashed rgba(196,94,50,0.25)", color: "rgba(220,180,140,0.3)" }}
               >
                 No tracks yet. Upload one from the home screen.
               </div>

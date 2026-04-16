@@ -125,32 +125,31 @@ export default function Home() {
   return (
     <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@700&family=Rajdhani:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Playfair+Display:ital,wght@0,400;0,600;0,700;0,800;0,900;1,400;1,700&family=Lora:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Courier+Prime:ital,wght@0,400;0,700;1,400&display=swap');
 
         :root {
-          --accent:  #9d50ff;
+          --accent:  #C45A2A;
           --green:   #22c55e;
           --red:     #ef4444;
         }
 
-        /* ── Upload card — clean white ── */
+        /* ── Upload card ── */
         .upload-card {
-          transition: transform 0.25s, box-shadow 0.25s;
+          transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
         }
         .upload-card:hover {
-          transform: scale(1.04);
-          box-shadow: 0 20px 60px rgba(0,0,0,0.5), 0 0 40px rgba(255,255,255,0.15) !important;
+          transform: translateY(-3px);
+          border-color: rgba(235,200,150,0.9) !important;
+          box-shadow: 0 22px 55px rgba(0,0,0,0.6), 0 0 45px rgba(196,94,50,0.35) !important;
         }
 
         /* ── Track rows ── */
         .track-row {
-          transition: background 0.15s, border-color 0.15s, transform 0.15s, box-shadow 0.15s;
+          transition: background 0.12s, border-color 0.12s;
         }
         .track-row:hover {
-          transform: scale(1.02);
-          background: rgba(255,255,255,0.04) !important;
-          border-color: rgba(255,255,255,0.14) !important;
-          box-shadow: 0 20px 60px rgba(0,0,0,0.5), 0 0 40px rgba(255,255,255,0.15) !important;
+          background: rgba(196,94,50,0.06) !important;
+          border-bottom-color: rgba(220,160,100,0.4) !important;
         }
 
         /* ── Settings button ── */
@@ -158,16 +157,16 @@ export default function Home() {
           transition: background 0.15s;
         }
         .settings-btn:hover {
-          background: rgba(0,0,0,0.12) !important;
+          background: rgba(196,94,50,0.22) !important;
         }
 
         /* ── Logo breathe ── */
         .logo-glow {
-          animation: logo-breathe 5s ease-in-out infinite;
+          animation: logo-breathe 6s ease-in-out infinite;
         }
         @keyframes logo-breathe {
-          0%,100% { opacity: 0.1; transform: scale(1); }
-          50%      { opacity: 0.3; transform: scale(1.2); }
+          0%,100% { opacity: 0.10; transform: scale(1); }
+          50%      { opacity: 0.26; transform: scale(1.15); }
         }
 
         /* ── LEDs ── */
@@ -179,7 +178,7 @@ export default function Home() {
         }
         .led-purple {
           background: var(--accent);
-          box-shadow: 0 0 6px var(--accent), 0 0 14px rgba(157,80,255,0.6);
+          box-shadow: 0 0 6px var(--accent), 0 0 14px rgba(196,94,50,0.7);
           animation: led-blink 1.6s ease-in-out infinite;
         }
         .led-green {
@@ -198,9 +197,21 @@ export default function Home() {
       `}</style>
 
       <main
-        className="relative h-screen overflow-hidden bg-black px-6 py-4 text-white "
-        style={{ fontFamily: "'IBM Plex Mono', monospace" }}
+        className="relative h-screen overflow-hidden px-6 py-4 text-white"
+        style={{ fontFamily: "'Lora', serif", background: "#0f0c08" }}
       >
+
+        {/* ── Atmospheric background ── */}
+        <div className="pointer-events-none absolute inset-0 overflow-hidden">
+          {/* Warm light source — upper left, like a lamp off-screen */}
+          <div className="orb-1 absolute rounded-full" style={{ width: 1000, height: 1000, top: -400, left: -350, background: "radial-gradient(circle, rgba(196,94,50,0.32) 0%, rgba(160,60,20,0.12) 45%, transparent 70%)", filter: "blur(90px)" }} />
+          {/* Secondary warmth — lower right */}
+          <div className="orb-2 absolute rounded-full" style={{ width: 700, height: 700, bottom: -200, right: -180, background: "radial-gradient(circle, rgba(184,120,40,0.22) 0%, transparent 65%)", filter: "blur(80px)" }} />
+          {/* Strong vignette — keeps edges dark and atmospheric */}
+          <div className="absolute inset-0" style={{ background: "radial-gradient(ellipse at 30% 40%, transparent 30%, rgba(8,5,2,0.55) 75%, rgba(5,3,1,0.85) 100%)" }} />
+          {/* Heavy grain — the texture that makes it feel physical */}
+          <div className="absolute inset-0" style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")`, backgroundSize: "256px 256px", opacity: 0.18, mixBlendMode: "overlay" }} />
+        </div>
 
         <div className="relative mx-auto -mt-6 flex h-full w-full max-w-5xl flex-col items-center">
           <div className="relative -top-8">
@@ -208,7 +219,7 @@ export default function Home() {
             <div className="relative -mb-3 flex justify-center">
               <div
                 className="logo-glow absolute inset-0 rounded-full blur-2xl"
-                style={{ background: "rgba(157, 80, 255, 0.12)" }}
+                style={{ background: "rgba(196,94,50,0.18)" }}
               />
               <svg
                 viewBox="0 0 540 300"
@@ -229,8 +240,7 @@ export default function Home() {
                 {/* Glow bloom */}
                 <text
                   x="270" y="210"
-                  fontFamily="'Chakra Petch', sans-serif"
-                  fontWeight={700}
+                  fontFamily="'DM Serif Display', serif"
                   fontSize={190}
                   fill="rgba(255,255,255,0.12)"
                   textAnchor="middle"
@@ -243,8 +253,7 @@ export default function Home() {
                 {/* Main JAM text */}
                 <text
                   x="270" y="210"
-                  fontFamily="'Chakra Petch', sans-serif"
-                  fontWeight={700}
+                  fontFamily="'DM Serif Display', serif"
                   fontSize={190}
                   fill="#ffffff"
                   textAnchor="middle"
@@ -267,12 +276,11 @@ export default function Home() {
 
               <label
                 htmlFor="fileUpload"
-                className="upload-card flex h-[182px] w-[275px] cursor-pointer flex-col items-center justify-center rounded-2xl py-5"
+                className="upload-card relative flex h-[182px] w-[275px] cursor-pointer flex-col items-center justify-center rounded py-5"
                 style={{
-                  background: "rgba(18,14,28,0.85)",
-                  border: "2px solid rgba(255,255,255,0.28)",
-                  boxShadow: "0 16px 48px rgba(0,0,0,0.6), 0 0 0 1px rgba(0,0,0,0.4), 0 0 18px rgba(255,255,255,0.18), 0 0 6px rgba(255,255,255,0.25)",
-                  backdropFilter: "blur(16px)",
+                  background: "rgba(196,94,50,0.86)",
+                  border: "1px solid rgba(235,200,150,0.75)",
+                  boxShadow: "0 18px 50px rgba(0,0,0,0.6), 0 0 35px rgba(196,94,50,0.28)",
                 }}
               >
                 <svg
@@ -282,7 +290,7 @@ export default function Home() {
                   style={{ color: "#ffffff" }}
                   fill="none"
                   stroke="currentColor"
-                  strokeWidth="1.8"
+                  strokeWidth="1.5"
                   strokeLinecap="round"
                   strokeLinejoin="round"
                 >
@@ -291,8 +299,8 @@ export default function Home() {
                   <path d="M5 20h14" />
                 </svg>
                 <span
-                  className="text-[34px] font-semibold"
-                  style={{ fontFamily: "'Rajdhani', sans-serif", letterSpacing: "0.04em", color: "#ede8f5" }}
+                  className="text-[32px]"
+                  style={{ fontFamily: "'Lora', serif", fontStyle: "italic", fontWeight: 700, letterSpacing: "0.02em", color: "#ffffff" }}
                 >
                   Upload Track
                 </span>
@@ -302,51 +310,36 @@ export default function Home() {
 
           {/* Track list panel */}
           <div
-            className="flex min-h-0 w-full flex-1 rounded-[22px] p-4"
-            style={{
-              background: "rgba(18,14,28,0.8)",
-              border: "1px solid rgba(255,255,255,0.18)",
-              boxShadow: "0 22px 60px rgba(0,0,0,0.6), 0 0 0 1px rgba(0,0,0,0.4)",
-              backdropFilter: "blur(20px)",
-            }}
+            className="flex min-h-0 w-full flex-1 px-2 pt-1"
           >
             <div className="flex min-h-0 w-full flex-col">
               {/* Panel header */}
               <div
-                className="mb-4 grid grid-cols-3 items-center pb-2"
-                style={{ borderBottom: "1px solid rgba(157,80,255,0.1)" }}
+                className="mb-1 grid grid-cols-3 items-end pb-3"
+                style={{ borderBottom: "1px solid rgba(220,170,110,0.2)" }}
               >
                 <div>
                   <h2
-                    className="text-xl"
-                    style={{ fontFamily: "'Rajdhani', sans-serif", fontWeight: 600, letterSpacing: "0.06em", color: "#ede8f5" }}
+                    className="text-base"
+                    style={{ fontFamily: "'Playfair Display', serif", fontWeight: 400, fontStyle: "italic", letterSpacing: "0.06em", color: "rgba(220,180,140,0.55)" }}
                   >
                     Recent Tracks
                   </h2>
-                  <Link
-                    href="/songs"
-                    className="text-sm hover:underline"
-                    style={{ color: "rgba(237,232,245,0.35)", transition: "color 0.15s" }}
-                    onMouseEnter={e => (e.currentTarget.style.color = "#b07aff")}
-                    onMouseLeave={e => (e.currentTarget.style.color = "rgba(237,232,245,0.35)")}
-                  >
-                    View All
-                  </Link>
                 </div>
 
                 <div />
 
                 <div
-                  className="mr-8 grid w-[176px] shrink-0 justify-self-end grid-cols-[88px_72px] gap-4 text-sm"
-                  style={{ color: "#ffffff" }}
+                  className="mr-8 grid w-[176px] shrink-0 justify-self-end grid-cols-[88px_72px] gap-4 text-xs"
+                  style={{ color: "rgba(220,180,140,0.35)", fontFamily: "'Courier Prime', monospace", letterSpacing: "0.12em" }}
                 >
-                  <span className="flex items-center justify-center text-center">Key</span>
+                  <span className="flex items-center justify-center text-center">KEY</span>
                   <span className="flex items-center justify-center text-center">BPM</span>
                 </div>
               </div>
 
               {/* Track rows */}
-              <div className="min-h-0 flex-1 space-y-2 overflow-x-hidden overflow-y-auto pr-2">
+              <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto">
                 {songs.map((track, index) => {
                   const isReady   = track.analysisStatus === "ready";
                   const isError   = track.analysisStatus === "error";
@@ -356,11 +349,9 @@ export default function Home() {
                     <div key={track.id} className="relative">
                       <Link
                         href={getSongHref(track)}
-                        className="track-row flex items-center justify-between rounded-xl px-4 py-3"
+                        className="track-row flex items-center justify-between px-2 py-3"
                         style={{
-                          background: "rgba(255,255,255,0.04)",
-                          border: "1px solid rgba(255,255,255,0.14)",
-                          boxShadow: "0 2px 12px rgba(0,0,0,0.3)",
+                          borderBottom: "1px solid rgba(196,94,50,0.12)",
                         }}
                       >
                         <div className="flex items-center gap-4">
@@ -378,9 +369,9 @@ export default function Home() {
                             }}
                             className="settings-btn flex h-8 w-8 items-center justify-center rounded-md"
                             style={{
-                              background: "rgba(157,80,255,0.12)",
-                              color: "#ffffff",
-                              boxShadow: "0 0 0 1px rgba(157,80,255,0.2)",
+                              background: "rgba(196,94,50,0.14)",
+                              color: "#f0e4d0",
+                              boxShadow: "0 0 0 1px rgba(196,94,50,0.28)",
                             }}
                             aria-label={`Open settings for ${track.name}`}
                           >
@@ -400,14 +391,14 @@ export default function Home() {
                           </button>
 
 
-                          <span className="text-sm md:text-base" style={{ color: "#ede8f5" }}>
+                          <span className="text-sm md:text-base" style={{ color: "#f5ede0", fontFamily: "'Lora', serif" }}>
                             {track.name}
                           </span>
                         </div>
 
                         <div
                           className="mr-2 grid w-[176px] shrink-0 grid-cols-[88px_72px] gap-4 text-sm"
-                          style={{ color: isPending ? "rgba(255,255,255,0.2)" : "#ffffff" }}
+                          style={{ color: isPending ? "rgba(220,180,140,0.2)" : "rgba(220,180,140,0.75)", fontFamily: "'Courier Prime', monospace" }}
                         >
                           <span className="flex items-center justify-center text-center">
                             {isPending ? "···" : track.key}
@@ -425,8 +416,8 @@ export default function Home() {
                   <div
                     className="rounded-xl px-4 py-6 text-center text-sm"
                     style={{
-                      border: "1px dashed rgba(157,80,255,0.15)",
-                      color: "rgba(237,232,245,0.25)",
+                      border: "1px dashed rgba(196,94,50,0.22)",
+                      color: "rgba(220,180,140,0.3)",
                     }}
                   >
                     Upload a track to start your library.
@@ -451,13 +442,13 @@ export default function Home() {
               top: menuPosition.top,
               left: menuPosition.left - 200,
               transform: "translateY(-50%)",
-              background: "rgba(18,14,28,0.95)",
-              border: "1px solid rgba(157,80,255,0.2)",
+              background: "rgba(12,7,3,0.97)",
+              border: "1px solid rgba(196,94,50,0.28)",
               boxShadow: "0 20px 50px rgba(0,0,0,0.7)",
               backdropFilter: "blur(16px)",
             }}
           >
-            <div className="mb-2 px-2 text-xs" style={{ color: "rgba(237,232,245,0.35)" }}>
+            <div className="mb-2 px-2 text-xs" style={{ color: "rgba(220,180,140,0.45)", fontFamily: "'Lora', serif", letterSpacing: "0.08em" }}>
               Song Settings
             </div>
 
@@ -471,8 +462,8 @@ export default function Home() {
                 type="button"
                 onClick={onClick}
                 className="w-full rounded px-2 py-2 text-left text-sm"
-                style={{ color: "#ede8f5", background: "none", border: "none", cursor: "pointer", transition: "background 0.1s" }}
-                onMouseEnter={e => { e.currentTarget.style.background = "rgba(157,80,255,0.1)"; }}
+                style={{ color: "#f5ede0", fontFamily: "'Lora', serif", background: "none", border: "none", cursor: "pointer", transition: "background 0.1s" }}
+                onMouseEnter={e => { e.currentTarget.style.background = "rgba(196,94,50,0.14)"; }}
                 onMouseLeave={e => { e.currentTarget.style.background = "none"; }}
               >
                 {label}

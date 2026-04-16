@@ -846,7 +846,7 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
 
     return (
         <div className="relative h-screen overflow-hidden" style={{ fontFamily: "'IBM Plex Mono', monospace", backgroundColor: bgMode === "gradient" ? "#000000" : bgColor, color: "white" }}>
-          <style>{`@import url('https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@700&family=Rajdhani:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap');`}</style>
+          <style>{`@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;0,800;0,900;1,400;1,700&family=Lora:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Courier+Prime:ital,wght@0,400;0,700;1,400&display=swap');`}</style>
             {bgMode === "gradient" && (
                 <div
                     className="pointer-events-none absolute inset-0"
@@ -1123,8 +1123,8 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
                                     <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
                                 </filter>
                             </defs>
-                            <text x="270" y="210" fontFamily="'Chakra Petch', sans-serif" fontWeight={700} fontSize={190} fill="rgba(255,255,255,0.12)" textAnchor="middle" letterSpacing={16} filter="url(#j-glow)">JAM</text>
-                            <text x="270" y="210" fontFamily="'Chakra Petch', sans-serif" fontWeight={700} fontSize={190} fill="#ffffff" textAnchor="middle" letterSpacing={16}>JAM</text>
+                            <text x="270" y="210" fontFamily="'Playfair Display', serif" fontWeight="900" fontSize={190} fill="rgba(255,255,255,0.12)" textAnchor="middle" letterSpacing={16} filter="url(#j-glow)">JAM</text>
+                            <text x="270" y="210" fontFamily="'Playfair Display', serif" fontWeight="900" fontSize={190} fill="#ffffff" textAnchor="middle" letterSpacing={16}>JAM</text>
                         </svg>
                     </div>
                 </div>

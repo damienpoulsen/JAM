@@ -158,7 +158,7 @@ export default function PrepareJamPage({ params }: { params: Promise<{ id: strin
   return (
     <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;0,800;0,900;1,400;1,700&family=Lora:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Courier+Prime:ital,wght@0,400;0,700;1,400&display=swap');
 
         .bar-pulse {
           animation: bar-pulse 1.8s ease-in-out infinite;
@@ -170,19 +170,29 @@ export default function PrepareJamPage({ params }: { params: Promise<{ id: strin
       `}</style>
 
       <main
-        className="relative flex h-screen overflow-hidden bg-black px-6 py-4 text-white "
-        style={{ fontFamily: "'IBM Plex Mono', monospace" }}
+        className="relative flex h-screen overflow-hidden px-6 py-4 text-white"
+        style={{ fontFamily: "'Lora', serif", background: "#080704" }}
       >
+
+        {/* ── Atmospheric background ── */}
+        <div className="pointer-events-none absolute inset-0 overflow-hidden">
+          <div className="orb-1 absolute rounded-full" style={{ width: 650, height: 650, top: -180, left: -180, background: "radial-gradient(circle, rgba(196,94,50,0.38) 0%, transparent 70%)", filter: "blur(50px)" }} />
+          <div className="orb-2 absolute rounded-full" style={{ width: 750, height: 750, bottom: -220, right: -220, background: "radial-gradient(circle, rgba(110,45,18,0.32) 0%, transparent 70%)", filter: "blur(55px)" }} />
+          <div className="orb-3 absolute rounded-full" style={{ width: 500, height: 500, top: -80, left: "50%", transform: "translateX(-50%)", background: "radial-gradient(circle, rgba(210,155,65,0.18) 0%, transparent 70%)", filter: "blur(45px)" }} />
+          <div className="orb-1 absolute rounded-full" style={{ width: 400, height: 400, bottom: "20%", left: "30%", background: "radial-gradient(circle, rgba(110,45,18,0.14) 0%, transparent 70%)", filter: "blur(60px)" }} />
+          <div className="absolute inset-0" style={{ background: "radial-gradient(ellipse at center, transparent 50%, rgba(5,3,1,0.6) 100%)" }} />
+          <div className="absolute inset-0" style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")`, backgroundSize: "200px 200px", opacity: 0.04, mixBlendMode: "overlay" }} />
+        </div>
 
         {/* ── Content ── */}
         <div className="relative mx-auto flex w-full max-w-4xl flex-1 items-center justify-center">
           <div
             className="w-full max-w-xl rounded-[28px] px-8 py-10 text-center"
             style={{
-              background: "rgba(18,14,28,0.82)",
-              border: "1px solid rgba(255,255,255,0.18)",
-              boxShadow: "0 24px 70px rgba(0,0,0,0.6)",
-              backdropFilter: "blur(20px)",
+              background: "rgba(30,18,8,0.9)",
+              border: "1px solid rgba(196,94,50,0.38)",
+              boxShadow: "0 24px 70px rgba(0,0,0,0.5), 0 0 30px rgba(196,94,50,0.08)",
+              backdropFilter: "blur(12px)",
             }}
           >
             {/* Logo */}
@@ -202,28 +212,28 @@ export default function PrepareJamPage({ params }: { params: Promise<{ id: strin
                     </feMerge>
                   </filter>
                 </defs>
-                <text x="270" y="210" fontFamily="'Chakra Petch', sans-serif" fontWeight={700} fontSize={190} fill="rgba(255,255,255,0.12)" textAnchor="middle" letterSpacing={16} filter="url(#p-jam-glow)">JAM</text>
-                <text x="270" y="210" fontFamily="'Chakra Petch', sans-serif" fontWeight={700} fontSize={190} fill="#ffffff" textAnchor="middle" letterSpacing={16}>JAM</text>
+                <text x="270" y="210" fontFamily="'Playfair Display', serif" fontWeight="900" fontSize={190} fill="rgba(255,255,255,0.12)" textAnchor="middle" letterSpacing={16} filter="url(#p-jam-glow)">JAM</text>
+                <text x="270" y="210" fontFamily="'Playfair Display', serif" fontWeight="900" fontSize={190} fill="#ffffff" textAnchor="middle" letterSpacing={16}>JAM</text>
               </svg>
             </div>
 
             <div
               className="mb-3 text-xs uppercase"
-              style={{ letterSpacing: "0.3em", color: "rgba(237,232,245,0.35)" }}
+              style={{ letterSpacing: "0.3em", color: "rgba(196,94,50,0.75)", fontFamily: "'Playfair Display', serif" }}
             >
               Loading
             </div>
 
             <h1
               className="mb-3 text-2xl font-semibold"
-              style={{ fontFamily: "'Rajdhani', sans-serif", color: "#ede8f5", letterSpacing: "0.03em" }}
+              style={{ fontFamily: "'Playfair Display', serif", color: "#f5ede0", letterSpacing: "0.02em", fontWeight: 600 }}
             >
               {songName}
             </h1>
 
             {errorMessage ? (
               <>
-                <p className="mx-auto mb-6 max-w-md text-sm" style={{ color: "rgba(237,232,245,0.55)" }}>
+                <p className="mx-auto mb-6 max-w-md text-sm" style={{ color: "rgba(220,180,140,0.55)" }}>
                   {errorMessage}
                 </p>
                 <div className="flex flex-col items-center gap-3">
@@ -268,22 +278,24 @@ export default function PrepareJamPage({ params }: { params: Promise<{ id: strin
                         }
                       })();
                     }}
-                    className="inline-flex rounded-xl px-5 py-3 text-sm font-medium text-white transition"
+                    className="inline-flex rounded-lg px-5 py-3 text-sm font-medium text-white transition"
                     style={{
-                      background: "rgba(157,80,255,0.2)",
-                      border: "1px solid rgba(157,80,255,0.4)",
+                      background: "rgba(196,94,50,0.22)",
+                      border: "1px solid rgba(196,94,50,0.5)",
                       cursor: "pointer",
+                      fontFamily: "'Lora', serif",
                     }}
                   >
                     Try Again
                   </button>
                   <Link
                     href={`/jam/${id}`}
-                    className="inline-flex rounded-xl px-5 py-3 text-sm font-medium transition"
+                    className="inline-flex rounded-lg px-5 py-3 text-sm font-medium transition"
                     style={{
-                      background: "rgba(157,80,255,0.08)",
-                      border: "1px solid rgba(255,255,255,0.12)",
-                      color: "rgba(237,232,245,0.55)",
+                      background: "rgba(196,94,50,0.08)",
+                      border: "1px solid rgba(196,94,50,0.25)",
+                      color: "rgba(220,180,140,0.65)",
+                      fontFamily: "'Lora', serif",
                     }}
                   >
                     Open Jam Anyway
@@ -292,7 +304,7 @@ export default function PrepareJamPage({ params }: { params: Promise<{ id: strin
               </>
             ) : (
               <>
-                <p className="mx-auto mb-8 max-w-md text-sm" style={{ color: "rgba(237,232,245,0.45)" }}>
+                <p className="mx-auto mb-8 max-w-md text-sm" style={{ color: "rgba(220,180,140,0.45)" }}>
                   Building BPM and chord data for your first session. This screen will jump into the jam
                   page as soon as it is ready.
                 </p>
@@ -304,10 +316,10 @@ export default function PrepareJamPage({ params }: { params: Promise<{ id: strin
                   >
                     <div
                       className="bar-pulse h-full rounded-full"
-                      style={{ background: "rgba(157,80,255,0.8)" }}
+                      style={{ background: "rgba(196,94,50,0.9)" }}
                     />
                   </div>
-                  <span className="text-xs" style={{ color: "rgba(237,232,245,0.4)" }}>Analyzing…</span>
+                  <span className="text-xs" style={{ color: "rgba(220,180,140,0.45)" }}>Analyzing…</span>
                 </div>
               </>
             )}
