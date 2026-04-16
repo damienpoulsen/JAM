@@ -79,42 +79,45 @@ export default function SongsPage() {
         @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;0,800;0,900;1,400;1,700&family=Lora:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Courier+Prime:ital,wght@0,400;0,700;1,400&display=swap');
 
         .song-card {
-          transition: transform 0.15s, box-shadow 0.15s, border-color 0.15s;
+          transition: background 0.12s, border-color 0.12s;
         }
         .song-card:hover {
-          transform: scale(1.02);
-          border-color: rgba(196,94,50,0.55) !important;
-          box-shadow: 0 12px 40px rgba(0,0,0,0.45), 0 0 20px rgba(196,94,50,0.14) !important;
+          background: rgba(196,94,50,0.06) !important;
+          border-bottom-color: rgba(220,160,100,0.4) !important;
         }
         .settings-btn {
           transition: background 0.15s;
         }
         .settings-btn:hover {
-          background: rgba(196,94,50,0.25) !important;
+          background: rgba(196,94,50,0.22) !important;
         }
       `}</style>
 
       <div
-        className="min-h-screen px-8 py-8 text-white"
-        style={{ fontFamily: "'Lora', serif", background: "#080704" }}
+        className="relative min-h-screen px-8 py-8 text-white"
+        style={{ fontFamily: "'Lora', serif", background: "#0f0c08" }}
       >
 
-        {/* Side lines */}
-        <div className="pointer-events-none fixed top-[144px] bottom-[144px] left-[10%] w-px" style={{ background: "rgba(196,94,50,0.18)" }} />
-        <div className="pointer-events-none fixed top-[144px] bottom-[144px] right-[10%] w-px" style={{ background: "rgba(196,94,50,0.18)" }} />
+        {/* ── Atmospheric background ── */}
+        <div className="pointer-events-none fixed inset-0 overflow-hidden">
+          <div className="orb-1 absolute rounded-full" style={{ width: 1000, height: 1000, top: -400, left: -350, background: "radial-gradient(circle, rgba(196,94,50,0.28) 0%, rgba(160,60,20,0.10) 45%, transparent 70%)", filter: "blur(90px)" }} />
+          <div className="orb-2 absolute rounded-full" style={{ width: 700, height: 700, bottom: -200, right: -180, background: "radial-gradient(circle, rgba(184,120,40,0.18) 0%, transparent 65%)", filter: "blur(80px)" }} />
+          <div className="absolute inset-0" style={{ background: "radial-gradient(ellipse at 30% 40%, transparent 30%, rgba(8,5,2,0.5) 75%, rgba(5,3,1,0.82) 100%)" }} />
+          <div className="absolute inset-0" style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")`, backgroundSize: "256px 256px", opacity: 0.18, mixBlendMode: "overlay" }} />
+        </div>
 
         <div className="relative mx-auto max-w-6xl">
           {/* Header */}
-          <div className="mb-8 flex items-center justify-center relative">
+          <div className="mb-10 flex items-end justify-between border-b pb-4" style={{ borderColor: "rgba(220,170,110,0.2)" }}>
             <h1
-              className="text-5xl text-center"
+              className="text-5xl"
               style={{ fontFamily: "'Playfair Display', serif", fontWeight: 700, letterSpacing: "0.04em" }}
             >
               All Tracks
             </h1>
             <Link
               href="/"
-              className="absolute right-0 text-sm"
+              className="text-sm mb-1"
               style={{ color: "rgba(220,180,140,0.45)", transition: "color 0.15s" }}
               onMouseEnter={e => (e.currentTarget.style.color = "#C45A2A")}
               onMouseLeave={e => (e.currentTarget.style.color = "rgba(220,180,140,0.45)")}
@@ -123,8 +126,8 @@ export default function SongsPage() {
             </Link>
           </div>
 
-          {/* Grid */}
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {/* Track list */}
+          <div className="flex flex-col">
             {songs.map((song, index) => {
               const isPending = song.analysisStatus !== "ready" && song.analysisStatus !== "error";
 
@@ -141,11 +144,9 @@ export default function SongsPage() {
                 <div key={song.id} className="relative">
                   <Link href={getSongHref(song)}>
                     <div
-                      className="song-card relative flex items-center gap-4 rounded-xl p-4 cursor-pointer"
+                      className="song-card relative flex items-center gap-4 px-2 py-4 cursor-pointer"
                       style={{
-                        background: "rgba(196,94,50,0.08)",
-                        border: "1px solid rgba(196,94,50,0.25)",
-                        boxShadow: "0 4px 20px rgba(0,0,0,0.35)",
+                        borderBottom: "1px solid rgba(196,94,50,0.12)",
                       }}
                     >
                       {/* Settings button */}
@@ -234,12 +235,9 @@ export default function SongsPage() {
             })}
 
             {songs.length === 0 && (
-              <div
-                className="col-span-3 rounded-xl px-4 py-10 text-center text-sm"
-                style={{ border: "1px dashed rgba(196,94,50,0.25)", color: "rgba(220,180,140,0.3)" }}
-              >
+              <p className="py-10 text-center text-sm" style={{ color: "rgba(220,180,140,0.3)", fontStyle: "italic" }}>
                 No tracks yet. Upload one from the home screen.
-              </div>
+              </p>
             )}
           </div>
         </div>

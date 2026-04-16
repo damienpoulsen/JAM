@@ -171,28 +171,24 @@ export default function PrepareJamPage({ params }: { params: Promise<{ id: strin
 
       <main
         className="relative flex h-screen overflow-hidden px-6 py-4 text-white"
-        style={{ fontFamily: "'Lora', serif", background: "#080704" }}
+        style={{ fontFamily: "'Lora', serif", background: "#0f0c08" }}
       >
 
         {/* ── Atmospheric background ── */}
         <div className="pointer-events-none absolute inset-0 overflow-hidden">
-          <div className="orb-1 absolute rounded-full" style={{ width: 650, height: 650, top: -180, left: -180, background: "radial-gradient(circle, rgba(196,94,50,0.38) 0%, transparent 70%)", filter: "blur(50px)" }} />
-          <div className="orb-2 absolute rounded-full" style={{ width: 750, height: 750, bottom: -220, right: -220, background: "radial-gradient(circle, rgba(110,45,18,0.32) 0%, transparent 70%)", filter: "blur(55px)" }} />
-          <div className="orb-3 absolute rounded-full" style={{ width: 500, height: 500, top: -80, left: "50%", transform: "translateX(-50%)", background: "radial-gradient(circle, rgba(210,155,65,0.18) 0%, transparent 70%)", filter: "blur(45px)" }} />
-          <div className="orb-1 absolute rounded-full" style={{ width: 400, height: 400, bottom: "20%", left: "30%", background: "radial-gradient(circle, rgba(110,45,18,0.14) 0%, transparent 70%)", filter: "blur(60px)" }} />
-          <div className="absolute inset-0" style={{ background: "radial-gradient(ellipse at center, transparent 50%, rgba(5,3,1,0.6) 100%)" }} />
-          <div className="absolute inset-0" style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")`, backgroundSize: "200px 200px", opacity: 0.04, mixBlendMode: "overlay" }} />
+          <div className="orb-1 absolute rounded-full" style={{ width: 1000, height: 1000, top: -400, left: -350, background: "radial-gradient(circle, rgba(196,94,50,0.32) 0%, rgba(160,60,20,0.12) 45%, transparent 70%)", filter: "blur(90px)" }} />
+          <div className="orb-2 absolute rounded-full" style={{ width: 700, height: 700, bottom: -200, right: -180, background: "radial-gradient(circle, rgba(184,120,40,0.22) 0%, transparent 65%)", filter: "blur(80px)" }} />
+          <div className="absolute inset-0" style={{ background: "radial-gradient(ellipse at 30% 40%, transparent 30%, rgba(8,5,2,0.55) 75%, rgba(5,3,1,0.85) 100%)" }} />
+          <div className="absolute inset-0" style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")`, backgroundSize: "256px 256px", opacity: 0.18, mixBlendMode: "overlay" }} />
         </div>
 
         {/* ── Content ── */}
         <div className="relative mx-auto flex w-full max-w-4xl flex-1 items-center justify-center">
           <div
-            className="w-full max-w-xl rounded-[28px] px-8 py-10 text-center"
+            className="w-full max-w-xl px-8 py-10 text-center"
             style={{
-              background: "rgba(30,18,8,0.9)",
-              border: "1px solid rgba(196,94,50,0.38)",
-              boxShadow: "0 24px 70px rgba(0,0,0,0.5), 0 0 30px rgba(196,94,50,0.08)",
-              backdropFilter: "blur(12px)",
+              borderTop: "1px solid rgba(220,170,110,0.2)",
+              borderBottom: "1px solid rgba(220,170,110,0.2)",
             }}
           >
             {/* Logo */}

@@ -339,7 +339,7 @@ export default function Home() {
               </div>
 
               {/* Track rows */}
-              <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto">
+              <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto pb-1">
                 {songs.map((track, index) => {
                   const isReady   = track.analysisStatus === "ready";
                   const isError   = track.analysisStatus === "error";
@@ -413,17 +413,25 @@ export default function Home() {
                 })}
 
                 {songs.length === 0 && (
-                  <div
-                    className="rounded-xl px-4 py-6 text-center text-sm"
-                    style={{
-                      border: "1px dashed rgba(196,94,50,0.22)",
-                      color: "rgba(220,180,140,0.3)",
-                    }}
-                  >
+                  <p className="py-8 text-center text-sm" style={{ color: "rgba(220,180,140,0.3)", fontStyle: "italic" }}>
                     Upload a track to start your library.
-                  </div>
+                  </p>
                 )}
               </div>
+
+              {songs.length > 0 && (
+                <div className="pt-3">
+                  <Link
+                    href="/songs"
+                    className="text-xs"
+                    style={{ color: "rgba(220,180,140,0.35)", transition: "color 0.15s", fontFamily: "'Courier Prime', monospace", letterSpacing: "0.1em" }}
+                    onMouseEnter={e => (e.currentTarget.style.color = "#C45A2A")}
+                    onMouseLeave={e => (e.currentTarget.style.color = "rgba(220,180,140,0.35)")}
+                  >
+                    VIEW ALL →
+                  </Link>
+                </div>
+              )}
             </div>
           </div>
         </div>
