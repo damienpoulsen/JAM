@@ -202,14 +202,10 @@ export default function Home() {
       >
 
         {/* ── Atmospheric background ── */}
-        <div className="pointer-events-none absolute inset-0 overflow-hidden">
-          {/* Warm light source — upper left, like a lamp off-screen */}
-          <div className="orb-1 absolute rounded-full" style={{ width: 1000, height: 1000, top: -400, left: -350, background: "radial-gradient(circle, rgba(196,94,50,0.32) 0%, rgba(160,60,20,0.12) 45%, transparent 70%)", filter: "blur(90px)" }} />
-          {/* Secondary warmth — lower right */}
-          <div className="orb-2 absolute rounded-full" style={{ width: 700, height: 700, bottom: -200, right: -180, background: "radial-gradient(circle, rgba(184,120,40,0.22) 0%, transparent 65%)", filter: "blur(80px)" }} />
-          {/* Strong vignette — keeps edges dark and atmospheric */}
-          <div className="absolute inset-0" style={{ background: "radial-gradient(ellipse at 30% 40%, transparent 30%, rgba(8,5,2,0.55) 75%, rgba(5,3,1,0.85) 100%)" }} />
-          {/* Heavy grain — the texture that makes it feel physical */}
+        <div className="pointer-events-none fixed inset-0 overflow-hidden">
+          <div className="orb-1 absolute rounded-full" style={{ width: 1000, height: 1000, top: -400, left: -350, background: "radial-gradient(circle, rgba(196,94,50,0.28) 0%, rgba(160,60,20,0.10) 45%, transparent 70%)", filter: "blur(90px)" }} />
+          <div className="orb-2 absolute rounded-full" style={{ width: 700, height: 700, bottom: -200, right: -180, background: "radial-gradient(circle, rgba(184,120,40,0.18) 0%, transparent 65%)", filter: "blur(80px)" }} />
+          <div className="absolute inset-0" style={{ background: "radial-gradient(ellipse at 30% 40%, transparent 30%, rgba(8,5,2,0.5) 75%, rgba(5,3,1,0.82) 100%)" }} />
           <div className="absolute inset-0" style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")`, backgroundSize: "256px 256px", opacity: 0.18, mixBlendMode: "overlay" }} />
         </div>
 
@@ -316,22 +312,33 @@ export default function Home() {
               {/* Panel header */}
               <div
                 className="mb-1 grid grid-cols-3 items-end pb-3"
-                style={{ borderBottom: "1px solid rgba(220,170,110,0.2)" }}
+                style={{ borderBottom: "1px solid rgba(255,255,255,0.25)" }}
               >
                 <div>
                   <h2
-                    className="text-base"
-                    style={{ fontFamily: "'Playfair Display', serif", fontWeight: 400, fontStyle: "italic", letterSpacing: "0.06em", color: "rgba(220,180,140,0.55)" }}
+                    className="text-xl"
+                    style={{ fontFamily: "'Playfair Display', serif", fontWeight: 400, fontStyle: "italic", letterSpacing: "0.06em", color: "#ffffff" }}
                   >
                     Recent Tracks
                   </h2>
+                  {songs.length > 0 && (
+                    <Link
+                      href="/songs"
+                      className="mt-1 block text-xs"
+                      style={{ color: "rgba(220,180,140,0.35)", transition: "color 0.15s", fontFamily: "'Courier Prime', monospace", letterSpacing: "0.1em" }}
+                      onMouseEnter={e => (e.currentTarget.style.color = "#C45A2A")}
+                      onMouseLeave={e => (e.currentTarget.style.color = "rgba(220,180,140,0.35)")}
+                    >
+                      VIEW ALL →
+                    </Link>
+                  )}
                 </div>
 
                 <div />
 
                 <div
                   className="mr-8 grid w-[176px] shrink-0 justify-self-end grid-cols-[88px_72px] gap-4 text-xs"
-                  style={{ color: "rgba(220,180,140,0.35)", fontFamily: "'Courier Prime', monospace", letterSpacing: "0.12em" }}
+                  style={{ color: "#ffffff", fontFamily: "'Courier Prime', monospace", letterSpacing: "0.12em" }}
                 >
                   <span className="flex items-center justify-center text-center">KEY</span>
                   <span className="flex items-center justify-center text-center">BPM</span>
@@ -351,7 +358,7 @@ export default function Home() {
                         href={getSongHref(track)}
                         className="track-row flex items-center justify-between px-2 py-3"
                         style={{
-                          borderBottom: "1px solid rgba(196,94,50,0.12)",
+                          borderBottom: "1px solid rgba(255,255,255,0.12)",
                         }}
                       >
                         <div className="flex items-center gap-4">
@@ -391,14 +398,14 @@ export default function Home() {
                           </button>
 
 
-                          <span className="text-sm md:text-base" style={{ color: "#f5ede0", fontFamily: "'Lora', serif" }}>
+                          <span className="text-sm md:text-base" style={{ color: "#ffffff", fontFamily: "'Lora', serif" }}>
                             {track.name}
                           </span>
                         </div>
 
                         <div
-                          className="mr-2 grid w-[176px] shrink-0 grid-cols-[88px_72px] gap-4 text-sm"
-                          style={{ color: isPending ? "rgba(220,180,140,0.2)" : "rgba(220,180,140,0.75)", fontFamily: "'Courier Prime', monospace" }}
+                          className="mr-8 grid w-[176px] shrink-0 grid-cols-[88px_72px] gap-4 text-sm"
+                          style={{ color: isPending ? "rgba(255,255,255,0.2)" : "#ffffff", fontFamily: "'Courier Prime', monospace" }}
                         >
                           <span className="flex items-center justify-center text-center">
                             {isPending ? "···" : track.key}
@@ -418,20 +425,6 @@ export default function Home() {
                   </p>
                 )}
               </div>
-
-              {songs.length > 0 && (
-                <div className="pt-3">
-                  <Link
-                    href="/songs"
-                    className="text-xs"
-                    style={{ color: "rgba(220,180,140,0.35)", transition: "color 0.15s", fontFamily: "'Courier Prime', monospace", letterSpacing: "0.1em" }}
-                    onMouseEnter={e => (e.currentTarget.style.color = "#C45A2A")}
-                    onMouseLeave={e => (e.currentTarget.style.color = "rgba(220,180,140,0.35)")}
-                  >
-                    VIEW ALL →
-                  </Link>
-                </div>
-              )}
             </div>
           </div>
         </div>
