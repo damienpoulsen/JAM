@@ -45,7 +45,7 @@ export default function Home() {
       bpm: "--",
       analysisStatus: "pending",
     };
-    const updatedSongs = [pendingSong, ...songs];
+    const updatedSongs = [pendingSong, ...readSongs()];
 
     setSongs(updatedSongs);
     writeSongs(updatedSongs);
