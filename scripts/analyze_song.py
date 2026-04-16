@@ -691,7 +691,6 @@ def infer_beat_start_time(
 def analyze_bpm_and_beats(audio_path: Path) -> tuple[float | None, float | None]:
     signal, sample_rate = librosa.load(audio_path, sr=22050, mono=True)
     _, percussive = librosa.effects.hpss(signal)
-    del signal
 
     # Percussive onset: strong for drums/transients
     onset_percussive = librosa.onset.onset_strength(
@@ -707,6 +706,7 @@ def analyze_bpm_and_beats(audio_path: Path) -> tuple[float | None, float | None]
         hop_length=BPM_HOP_LENGTH,
         aggregate=np.median,
     )
+    del signal
     # Blend: percussive-dominant but full-signal fills in melodic content
     min_len = min(len(onset_percussive), len(onset_full))
     onset_envelope = 0.65 * onset_percussive[:min_len] + 0.35 * onset_full[:min_len]
