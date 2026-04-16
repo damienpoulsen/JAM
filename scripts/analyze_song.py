@@ -12,6 +12,7 @@ Current goal:
 from __future__ import annotations
 
 import argparse
+import gc
 import json
 import os
 import tempfile
@@ -546,6 +547,8 @@ def detect_chord_events(
         return ([], None)
 
     smoothed_segments = smooth_chord_segments(results)
+    del results
+    gc.collect()
 
     chord_key = infer_key_from_segments(smoothed_segments)
     chroma_key = detect_key_from_chromagram(audio_path)
@@ -686,8 +689,9 @@ def infer_beat_start_time(
 
 
 def analyze_bpm_and_beats(audio_path: Path) -> tuple[float | None, float | None]:
-    signal, sample_rate = librosa.load(audio_path, sr=None, mono=True)
+    signal, sample_rate = librosa.load(audio_path, sr=22050, mono=True)
     _, percussive = librosa.effects.hpss(signal)
+    del signal
 
     # Percussive onset: strong for drums/transients
     onset_percussive = librosa.onset.onset_strength(
@@ -770,6 +774,8 @@ def analyze_bpm_and_beats(audio_path: Path) -> tuple[float | None, float | None]
     else:
         beat_start_time = infer_beat_start_time(beat_times, beat_frames, onset_envelope, bpm)
 
+    del percussive, onset_envelope, beat_frames, beat_times, autocorrelation
+    gc.collect()
     return bpm, beat_start_time
 
 

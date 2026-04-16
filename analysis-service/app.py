@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import gc
 import os
 import shutil
 import tempfile
@@ -91,3 +92,4 @@ async def analyze(
         except Exception:
             pass
         shutil.rmtree(temp_dir, ignore_errors=True)
+        gc.collect()
