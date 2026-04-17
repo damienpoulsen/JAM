@@ -7,6 +7,8 @@ import ColorWheelPicker from "./components/ColorWheelPicker";
 import Fretboard from "./components/Fretboard";
 import OverlayControls from "./components/OverlayControls";
 import PlaybackControls from "./components/PlaybackControls";
+import MobileFretboardSettings from "./components/MobileFretboardSettings";
+import MobilePlaybackControls from "./components/MobilePlaybackControls";
 import {
     buildLayer,
     normalizeLayerConfig,
@@ -300,6 +302,7 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
     const [presetNameDraft, setPresetNameDraft] = useState("");
     const [editingName, setEditingName] = useState(false);
     const [volumeOpen, setVolumeOpen] = useState(false);
+    const [mobileSettingsOpen, setMobileSettingsOpen] = useState(false);
     const [keyOpen, setKeyOpen] = useState(false);
     const [layersOpen, setLayersOpen] = useState(false);
     const [layerConfigs, setLayerConfigs] = useState<LayerConfig[]>(() => [
@@ -424,6 +427,19 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
         const mins = Math.floor(time / 60);
         const secs = Math.floor(time % 60);
         return `${mins}:${secs.toString().padStart(2, "0")}`;
+    };
+
+    const handleTimelineTouch = (event: React.TouchEvent<HTMLDivElement>) => {
+        if (!isAudioAvailable) return;
+        const touch = event.touches[0];
+        if (!touch) return;
+        const rect = event.currentTarget.getBoundingClientRect();
+        const percent = Math.max(0, Math.min((touch.clientX - rect.left) / rect.width, 1));
+        const time = percent * duration;
+        if (audioRef.current) {
+            audioRef.current.currentTime = time;
+            setCurrentTime(time);
+        }
     };
 
     const visibleAudioError =
@@ -859,7 +875,7 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
 
             {/* Left panel + handle (slide together) */}
             <div
-                className="absolute top-0 left-0 z-40 h-full transition-all duration-300"
+                className="absolute top-0 left-0 z-40 h-full transition-all duration-300 hidden md:block"
                 style={{ transform: panelOpen ? "translateX(0)" : "translateX(-240px)" }}
             >
                 {/* Panel content */}
@@ -1112,7 +1128,7 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
                 </div>
             </div>
 
-            <div className="relative h-full flex flex-col px-8 pt-0 pb-2">
+            <div className="hidden md:flex relative h-full flex-col px-8 pt-0 pb-2">
                 {/* Header / app branding */}
                 <div className="flex items-center justify-between pb-2 pt-2">
                     <div className="cursor-pointer select-none">
@@ -1399,6 +1415,99 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
                         </>
                     )}
                 </div>
+            </div>
+
+            {/* ── Mobile layout (phones only, desktop untouched above) ── */}
+            <div className="flex md:hidden h-full flex-col overflow-hidden">
+
+                {/* Chord display — top 30% */}
+                <div className="flex h-[30%] flex-col items-center justify-center px-6 pt-2">
+                    <div
+                        className="text-[clamp(3.5rem,16vw,6rem)] font-bold leading-none truncate max-w-full text-center drop-shadow-[0_4px_12px_rgba(0,0,0,0.3)]"
+                        style={{ color: chordDisplayColor || "#ffffff", fontFamily: "'Playfair Display', serif" }}
+                    >
+                        {currentChord || "—"}
+                    </div>
+                    <div
+                        className="mt-3 text-[clamp(1.8rem,8vw,3rem)] leading-none text-center"
+                        style={{ color: chordDisplayColor ? `${chordDisplayColor}66` : "rgba(255,255,255,0.4)", fontFamily: "'Playfair Display', serif" }}
+                    >
+                        {nextChord || ""}
+                    </div>
+                </div>
+
+                {/* Fretboard — middle 50% */}
+                <div className="flex h-[50%] flex-col overflow-hidden">
+                    <div className="flex shrink-0 items-center px-3 pb-1.5">
+                        <button
+                            type="button"
+                            onClick={() => setMobileSettingsOpen(true)}
+                            className="rounded-lg border border-white/25 bg-black/40 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-white/80"
+                            style={{ fontFamily: "'Rajdhani', sans-serif" }}
+                        >
+                            Fretboard Settings
+                        </button>
+                    </div>
+                    <div className="flex-1 overflow-x-auto overflow-y-hidden">
+                        <div style={{ minWidth: "200vw" }} className="h-full">
+                            <Fretboard
+                                boardColorOverride={boardColor}
+                                stringColorOverride={stringColor}
+                                markerColorOverride={markerColor}
+                                labelTextColor={fretLabelTextColor}
+                                noteTextColor={noteTextColor}
+                                fretMarkers={fretMarkers}
+                                frets={frets}
+                                getDisplayedFretboardLabel={getDisplayedFretboardLabel}
+                                getLayerBorderStyle={getLayerBorderStyle}
+                                mergedNoteMap={mergedNoteMap}
+                                strings={strings}
+                                tuning={tuning}
+                                tuningIndex={tuningIndex}
+                            />
+                        </div>
+                    </div>
+                </div>
+
+                {/* Playback controls — bottom 20% */}
+                <div className="h-[20%] shrink-0">
+                    <MobilePlaybackControls
+                        barColor={playheadColor}
+                        contentColor={playbackContentColor}
+                        currentTime={currentTime}
+                        duration={duration}
+                        formatTime={formatTime}
+                        isAudioAvailable={isAudioAvailable}
+                        isPlaying={isPlaying}
+                        masterVolume={masterVolume}
+                        progress={progress}
+                        songName={song.name}
+                        volumeOpen={volumeOpen}
+                        onTimelineTouchStart={handleTimelineTouch}
+                        onTimelineTouchMove={handleTimelineTouch}
+                        onTogglePlay={togglePlay}
+                        onToggleVolumeOpen={() => setVolumeOpen((current) => !current)}
+                        onVolumeChange={setMasterVolume}
+                    />
+                </div>
+
+                {/* Mobile fretboard settings sheet */}
+                <MobileFretboardSettings
+                    isOpen={mobileSettingsOpen}
+                    onClose={() => setMobileSettingsOpen(false)}
+                    canAddLayer={normalizedLayerConfigs.length < SLOT_ORDER.length}
+                    layerConfigs={normalizedLayerConfigs}
+                    noteDisplayMode={noteDisplayMode}
+                    onAddLayer={addLayer}
+                    onRemoveLayer={removeLayer}
+                    onLayerColorChange={(slot, color) => updateLayerConfig(slot, "color", color)}
+                    onLayerKindChange={(slot, kind) => updateLayerConfig(slot, "kind", kind)}
+                    onToggleNoteDisplayMode={() =>
+                        setNoteDisplayMode((currentMode) =>
+                            currentMode === "notes" ? "intervals" : "notes"
+                        )
+                    }
+                />
             </div>
         </div>
     );
