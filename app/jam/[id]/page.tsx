@@ -1428,39 +1428,40 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
             {/* ── Mobile layout (phones only, desktop untouched above) ── */}
             <div className="flex min-[900px]:hidden h-full flex-col overflow-hidden">
 
-                {/* Chord display — top 30%, current + next side by side */}
-                <div className="flex h-[30%] flex-row items-start gap-3 pt-4 px-4">
+                {/* Settings button — absolute top right */}
+                <button
+                    type="button"
+                    onClick={() => setMobileSettingsOpen(true)}
+                    className="absolute top-4 right-4 z-30 flex h-9 w-9 flex-col items-center justify-center gap-[5px] rounded-lg border border-white/25 bg-black/40"
+                    aria-label="Settings"
+                >
+                    <span className="block h-[2px] w-4 rounded-full bg-white/75" />
+                    <span className="block h-[2px] w-4 rounded-full bg-white/75" />
+                    <span className="block h-[2px] w-4 rounded-full bg-white/75" />
+                </button>
+
+                {/* Chord display — top 35%, centered and large */}
+                <div className="flex h-[35%] flex-col items-center justify-center px-4">
                     <div
-                        className="text-[clamp(4.5rem,20vw,8rem)] font-bold leading-none truncate drop-shadow-[0_4px_12px_rgba(0,0,0,0.3)]"
+                        className="text-[clamp(5rem,24vw,10rem)] font-bold leading-none text-center drop-shadow-[0_4px_12px_rgba(0,0,0,0.3)]"
                         style={{ color: chordDisplayColor || "#ffffff", fontFamily: "'Playfair Display', serif" }}
                     >
                         {currentChord || "—"}
                     </div>
                     <div
-                        className="mt-5 shrink-0 text-[clamp(2rem,9vw,3.5rem)] leading-none"
+                        className="mt-3 text-[clamp(2.2rem,10vw,4rem)] leading-none text-center"
                         style={{ color: chordDisplayColor ? `${chordDisplayColor}66` : "rgba(255,255,255,0.4)", fontFamily: "'Playfair Display', serif" }}
                     >
                         {nextChord || ""}
                     </div>
                 </div>
 
-                {/* Fretboard — flex-1 (takes remaining space) */}
-                <div className="flex flex-1 flex-col overflow-hidden min-h-0">
-                    <div className="flex shrink-0 items-center px-3 pb-1.5">
-                        <button
-                            type="button"
-                            onClick={() => setMobileSettingsOpen(true)}
-                            className="flex h-8 w-8 flex-col items-center justify-center gap-[5px] rounded-lg border border-white/25 bg-black/40"
-                            aria-label="Settings"
-                        >
-                            <span className="block h-[2px] w-4 rounded-full bg-white/75" />
-                            <span className="block h-[2px] w-4 rounded-full bg-white/75" />
-                            <span className="block h-[2px] w-4 rounded-full bg-white/75" />
-                        </button>
-                    </div>
-                    <div className="flex-1 overflow-x-auto overflow-y-auto min-h-0">
+                {/* Fretboard — flex-1, horizontal scroll only */}
+                <div className="flex flex-1 overflow-hidden min-h-0">
+                    <div className="flex-1 overflow-x-auto overflow-y-hidden min-h-0">
                         <div style={{ minWidth: "200vw" }} className="h-full">
                             <Fretboard
+                                compact
                                 boardColorOverride={boardColor}
                                 stringColorOverride={stringColor}
                                 markerColorOverride={markerColor}
@@ -1489,15 +1490,11 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
                         formatTime={formatTime}
                         isAudioAvailable={isAudioAvailable}
                         isPlaying={isPlaying}
-                        masterVolume={masterVolume}
                         progress={progress}
                         songName={song.name}
-                        volumeOpen={volumeOpen}
                         onTimelineTouchStart={handleTimelineTouch}
                         onTimelineTouchMove={handleTimelineTouch}
                         onTogglePlay={togglePlay}
-                        onToggleVolumeOpen={() => setVolumeOpen((current) => !current)}
-                        onVolumeChange={setMasterVolume}
                     />
                 </div>
 

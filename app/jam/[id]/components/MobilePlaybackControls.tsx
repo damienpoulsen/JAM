@@ -10,15 +10,11 @@ type MobilePlaybackControlsProps = {
     formatTime: (time: number) => string;
     isAudioAvailable: boolean;
     isPlaying: boolean;
-    masterVolume: number;
     progress: number;
     songName: string;
-    volumeOpen: boolean;
     onTimelineTouchStart: (event: ReactTouchEvent<HTMLDivElement>) => void;
     onTimelineTouchMove: (event: ReactTouchEvent<HTMLDivElement>) => void;
     onTogglePlay: () => void;
-    onToggleVolumeOpen: () => void;
-    onVolumeChange: (value: number) => void;
 };
 
 export default function MobilePlaybackControls({
@@ -29,22 +25,18 @@ export default function MobilePlaybackControls({
     formatTime,
     isAudioAvailable,
     isPlaying,
-    masterVolume,
     progress,
     songName,
-    volumeOpen,
     onTimelineTouchStart,
     onTimelineTouchMove,
     onTogglePlay,
-    onToggleVolumeOpen,
-    onVolumeChange,
 }: MobilePlaybackControlsProps) {
     return (
         <div
             className="flex flex-col gap-1.5 rounded-t-2xl border-t-[1.5px] border-[#f4f4f5] px-4 pt-2 pb-3"
             style={{ background: barColor, color: contentColor }}
         >
-            {/* Song name (left) · Transport (center) · Volume (right) */}
+            {/* Song name (left) · Play button (center) */}
             <div className="flex items-center">
                 <div className="w-[30%] min-w-0">
                     <span
@@ -55,8 +47,7 @@ export default function MobilePlaybackControls({
                     </span>
                 </div>
 
-                <div className="flex flex-1 items-center justify-center gap-8 text-2xl">
-                    <button type="button">⏮</button>
+                <div className="flex flex-1 items-center justify-center text-2xl">
                     <button
                         type="button"
                         onClick={onTogglePlay}
@@ -65,50 +56,9 @@ export default function MobilePlaybackControls({
                     >
                         {isPlaying ? "⏸" : "▶"}
                     </button>
-                    <button type="button">⏭</button>
                 </div>
 
-                <div className="relative flex w-[30%] justify-end">
-                    <button
-                        type="button"
-                        onClick={onToggleVolumeOpen}
-                        aria-label="Volume"
-                        className="flex h-8 w-8 items-center justify-center opacity-80"
-                    >
-                        <svg
-                            viewBox="0 0 24 24"
-                            className="h-5 w-5"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="1.8"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                        >
-                            <path d="M5 10v4h3l4 4V6l-4 4H5z" />
-                            <path d="M16 9a4 4 0 0 1 0 6" />
-                        </svg>
-                    </button>
-                    {volumeOpen && (
-                        <div className="fixed inset-0 z-40" onClick={onToggleVolumeOpen} />
-                    )}
-                    {volumeOpen && (
-                        <div className="absolute right-0 bottom-[calc(100%+8px)] z-50 w-[200px] rounded-xl border border-white/10 bg-[#12121a] p-3 shadow-[0_-16px_50px_rgba(0,0,0,0.45)]">
-                            <div className="mb-2 flex items-center justify-between text-[11px] uppercase tracking-[0.14em] text-white/68">
-                                <span>Volume</span>
-                                <span>{Math.round(masterVolume * 100)}%</span>
-                            </div>
-                            <input
-                                type="range"
-                                min="0"
-                                max="1"
-                                step="0.05"
-                                value={masterVolume}
-                                onChange={(e) => onVolumeChange(Number(e.target.value))}
-                                className="w-full accent-white"
-                            />
-                        </div>
-                    )}
-                </div>
+                <div className="w-[30%]" />
             </div>
 
             {/* Timeline */}

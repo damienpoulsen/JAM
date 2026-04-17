@@ -18,6 +18,7 @@ type FretboardProps = {
     markerColorOverride?: string;
     labelTextColor?: "white" | "black";
     noteTextColor?: "white" | "black";
+    compact?: boolean;
     fretMarkers: number[];
     frets: number;
     getDisplayedFretboardLabel: (noteIndex: number) => string;
@@ -34,6 +35,7 @@ export default function Fretboard({
     markerColorOverride,
     labelTextColor,
     noteTextColor,
+    compact,
     fretMarkers,
     frets,
     getDisplayedFretboardLabel,
@@ -43,6 +45,7 @@ export default function Fretboard({
     tuning,
     tuningIndex,
 }: FretboardProps) {
+    const stringsHeightPx = compact ? 220 : 332;
     const boardBackground = boardColorOverride ?? "#0f1115";
     const isDarkBoard = hexLuminance(boardBackground) < 0.45;
     const boardBorder = isDarkBoard ? "#f4f4f5" : "#000000";
@@ -73,7 +76,7 @@ export default function Fretboard({
                     }}
                 >
                     <div className="flex">
-                        <div className="relative mr-6 h-[332px] w-9">
+                        <div className="relative mr-6 w-9" style={{ height: `${stringsHeightPx}px` }}>
                             {[...tuning].reverse().map((note, index) => {
                                 const stringIndex = strings - index - 1;
                                 const openNoteIndex = tuningIndex[stringIndex];
@@ -107,7 +110,7 @@ export default function Fretboard({
                         </div>
 
                         <div className="flex-1">
-                            <div className="relative h-[332px]">
+                            <div className="relative" style={{ height: `${stringsHeightPx}px` }}>
                                 <div
                                     className="absolute inset-0 rounded-[14px]"
                                     style={{ backgroundImage: innerGradient }}
@@ -169,7 +172,7 @@ export default function Fretboard({
                                                     transform: "translate(-50%, -50%)",
                                                 }}
                                             >
-                                                <div className="flex flex-col items-center gap-[68px]">
+                                                <div className="flex flex-col items-center" style={{ gap: `${Math.round(68 * stringsHeightPx / 332)}px` }}>
                                                     <div className="h-7 w-7 rounded-full" style={{ backgroundColor: markerColor }} />
                                                     <div className="h-7 w-7 rounded-full" style={{ backgroundColor: markerColor }} />
                                                 </div>
