@@ -45,7 +45,7 @@ export default function Fretboard({
     tuning,
     tuningIndex,
 }: FretboardProps) {
-    const stringsHeightPx = compact ? 220 : 332;
+    const stringsHeightPx = compact ? 260 : 332;
     const boardBackground = boardColorOverride ?? "#0f1115";
     const isDarkBoard = hexLuminance(boardBackground) < 0.45;
     const boardBorder = isDarkBoard ? "#f4f4f5" : "#000000";
@@ -65,7 +65,7 @@ export default function Fretboard({
     const effectiveNoteTextColor = noteTextColor === "black" ? "#111111" : noteTextColor === "white" ? "#ffffff" : undefined;
 
     return (
-        <div className="mt-0 mb-6 flex flex-1 items-start justify-center">
+        <div className={`mt-0 flex flex-1 items-start justify-center ${compact ? "mb-0" : "mb-6"}`}>
             <div className="w-[98%] max-w-[1600px]">
                 <div
                     className="relative rounded-[24px] border-[3px] px-10 pt-5 pb-2"

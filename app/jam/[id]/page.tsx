@@ -11,6 +11,7 @@ import MobileFretboardSettings from "./components/MobileFretboardSettings";
 import MobilePlaybackControls from "./components/MobilePlaybackControls";
 import {
     buildLayer,
+    LAYER_OPTIONS,
     normalizeLayerConfig,
     type LayerConfig,
     type LayerSlot,
@@ -1440,26 +1441,45 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
                     <span className="block h-[2px] w-4 rounded-full bg-white/75" />
                 </button>
 
-                {/* Chord display — top 35%, centered and large */}
-                <div className="flex h-[35%] flex-col items-center justify-center px-4">
+                {/* Chord display — top ~28%, centered */}
+                <div className="flex h-[28%] flex-col items-center justify-center px-4">
                     <div
-                        className="text-[clamp(5rem,24vw,10rem)] font-bold leading-none text-center drop-shadow-[0_4px_12px_rgba(0,0,0,0.3)]"
+                        className="text-[clamp(5.5rem,27vw,11rem)] font-bold leading-none text-center drop-shadow-[0_4px_12px_rgba(0,0,0,0.3)]"
                         style={{ color: chordDisplayColor || "#ffffff", fontFamily: "'Playfair Display', serif" }}
                     >
                         {currentChord || "—"}
                     </div>
                     <div
-                        className="mt-3 text-[clamp(2.2rem,10vw,4rem)] leading-none text-center"
+                        className="mt-2 text-[clamp(2.2rem,11vw,4.5rem)] leading-none text-center"
                         style={{ color: chordDisplayColor ? `${chordDisplayColor}66` : "rgba(255,255,255,0.4)", fontFamily: "'Playfair Display', serif" }}
                     >
                         {nextChord || ""}
                     </div>
                 </div>
 
-                {/* Fretboard — flex-1, horizontal scroll only */}
-                <div className="flex flex-1 overflow-hidden min-h-0">
-                    <div className="flex-1 overflow-x-auto overflow-y-hidden min-h-0">
-                        <div style={{ minWidth: "200vw" }} className="h-full">
+                {/* Fretboard — flex-1, pushed to bottom, horizontal scroll only */}
+                <div className="flex flex-col flex-1 overflow-hidden min-h-0 justify-end pb-2">
+                    {/* Theory layer toggle */}
+                    <div className="flex shrink-0 items-center px-3 pb-1">
+                        {(() => {
+                            const primaryLayer = normalizedLayerConfigs[0];
+                            const currentIdx = LAYER_OPTIONS.findIndex(o => o.value === primaryLayer?.kind);
+                            const safeIdx = currentIdx === -1 ? 0 : currentIdx;
+                            const nextIdx = (safeIdx + 1) % LAYER_OPTIONS.length;
+                            return (
+                                <button
+                                    type="button"
+                                    onClick={() => updateLayerConfig("primary", "kind", LAYER_OPTIONS[nextIdx].value)}
+                                    className="rounded-lg border border-white/25 bg-black/50 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.12em]"
+                                    style={{ fontFamily: "'Rajdhani', sans-serif", color: "rgba(255,255,255,0.82)" }}
+                                >
+                                    {LAYER_OPTIONS[safeIdx]?.label ?? "Off"}
+                                </button>
+                            );
+                        })()}
+                    </div>
+                    <div className="overflow-x-auto overflow-y-hidden">
+                        <div style={{ minWidth: "200vw" }}>
                             <Fretboard
                                 compact
                                 boardColorOverride={boardColor}
