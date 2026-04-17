@@ -1420,8 +1420,8 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
             {/* ── Mobile layout (phones only, desktop untouched above) ── */}
             <div className="flex md:hidden h-full flex-col overflow-hidden">
 
-                {/* Chord display — top 30% */}
-                <div className="flex h-[30%] flex-col items-center justify-center px-6 pt-2">
+                {/* Chord display — top ~18% */}
+                <div className="flex h-[18%] flex-col items-center justify-center px-6 pt-2">
                     <div
                         className="text-[clamp(3.5rem,16vw,6rem)] font-bold leading-none truncate max-w-full text-center drop-shadow-[0_4px_12px_rgba(0,0,0,0.3)]"
                         style={{ color: chordDisplayColor || "#ffffff", fontFamily: "'Playfair Display', serif" }}
@@ -1436,8 +1436,8 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
                     </div>
                 </div>
 
-                {/* Fretboard — middle 50% */}
-                <div className="flex h-[50%] flex-col overflow-hidden">
+                {/* Fretboard — flex-1 (takes remaining space) */}
+                <div className="flex flex-1 flex-col overflow-hidden min-h-0">
                     <div className="flex shrink-0 items-center px-3 pb-1.5">
                         <button
                             type="button"
@@ -1448,7 +1448,7 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
                             Fretboard Settings
                         </button>
                     </div>
-                    <div className="flex-1 overflow-x-auto overflow-y-hidden">
+                    <div className="flex-1 overflow-x-auto overflow-y-auto min-h-0">
                         <div style={{ minWidth: "200vw" }} className="h-full">
                             <Fretboard
                                 boardColorOverride={boardColor}
@@ -1469,8 +1469,8 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
                     </div>
                 </div>
 
-                {/* Playback controls — bottom 20% */}
-                <div className="h-[20%] shrink-0">
+                {/* Playback controls — compact fixed height */}
+                <div className="shrink-0">
                     <MobilePlaybackControls
                         barColor={playheadColor}
                         contentColor={playbackContentColor}
