@@ -1420,8 +1420,8 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
             {/* ── Mobile layout (phones only, desktop untouched above) ── */}
             <div className="flex md:hidden h-full flex-col overflow-hidden">
 
-                {/* Chord display — top ~18% */}
-                <div className="flex h-[18%] flex-col items-center justify-center px-6 pt-2">
+                {/* Chord display — top 30%, content pinned to top */}
+                <div className="flex h-[30%] flex-col items-center justify-start pt-4 px-6">
                     <div
                         className="text-[clamp(3.5rem,16vw,6rem)] font-bold leading-none truncate max-w-full text-center drop-shadow-[0_4px_12px_rgba(0,0,0,0.3)]"
                         style={{ color: chordDisplayColor || "#ffffff", fontFamily: "'Playfair Display', serif" }}
