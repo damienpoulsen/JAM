@@ -564,6 +564,14 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
         });
     };
 
+    useEffect(() => {
+        if (typeof screen !== "undefined" && "orientation" in screen) {
+            (screen.orientation as ScreenOrientation & { lock?: (o: string) => Promise<void> })
+                .lock?.("portrait")
+                ?.catch(() => {});
+        }
+    }, []);
+
     // Audio file loading lives separately from song metadata so one can fail without killing the page.
     useEffect(() => {
         if (!song.fileId) {
@@ -875,7 +883,7 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
 
             {/* Left panel + handle (slide together) */}
             <div
-                className="absolute top-0 left-0 z-40 h-full transition-all duration-300 hidden md:block"
+                className="absolute top-0 left-0 z-40 h-full transition-all duration-300 hidden min-[900px]:block"
                 style={{ transform: panelOpen ? "translateX(0)" : "translateX(-240px)" }}
             >
                 {/* Panel content */}
@@ -1128,7 +1136,7 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
                 </div>
             </div>
 
-            <div className="hidden md:flex relative h-full flex-col px-8 pt-0 pb-2">
+            <div className="hidden min-[900px]:flex relative h-full flex-col px-8 pt-0 pb-2">
                 {/* Header / app branding */}
                 <div className="flex items-center justify-between pb-2 pt-2">
                     <div className="cursor-pointer select-none">
@@ -1418,18 +1426,18 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
             </div>
 
             {/* ── Mobile layout (phones only, desktop untouched above) ── */}
-            <div className="flex md:hidden h-full flex-col overflow-hidden">
+            <div className="flex min-[900px]:hidden h-full flex-col overflow-hidden">
 
-                {/* Chord display — top 30%, content pinned to top */}
-                <div className="flex h-[30%] flex-col items-center justify-start pt-4 px-6">
+                {/* Chord display — top 30%, current + next side by side */}
+                <div className="flex h-[30%] flex-row items-start gap-3 pt-4 px-4">
                     <div
-                        className="text-[clamp(3.5rem,16vw,6rem)] font-bold leading-none truncate max-w-full text-center drop-shadow-[0_4px_12px_rgba(0,0,0,0.3)]"
+                        className="text-[clamp(4.5rem,20vw,8rem)] font-bold leading-none truncate drop-shadow-[0_4px_12px_rgba(0,0,0,0.3)]"
                         style={{ color: chordDisplayColor || "#ffffff", fontFamily: "'Playfair Display', serif" }}
                     >
                         {currentChord || "—"}
                     </div>
                     <div
-                        className="mt-3 text-[clamp(1.8rem,8vw,3rem)] leading-none text-center"
+                        className="mt-5 shrink-0 text-[clamp(2rem,9vw,3.5rem)] leading-none"
                         style={{ color: chordDisplayColor ? `${chordDisplayColor}66` : "rgba(255,255,255,0.4)", fontFamily: "'Playfair Display', serif" }}
                     >
                         {nextChord || ""}
@@ -1442,10 +1450,12 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
                         <button
                             type="button"
                             onClick={() => setMobileSettingsOpen(true)}
-                            className="rounded-lg border border-white/25 bg-black/40 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-white/80"
-                            style={{ fontFamily: "'Rajdhani', sans-serif" }}
+                            className="flex h-8 w-8 flex-col items-center justify-center gap-[5px] rounded-lg border border-white/25 bg-black/40"
+                            aria-label="Settings"
                         >
-                            Fretboard Settings
+                            <span className="block h-[2px] w-4 rounded-full bg-white/75" />
+                            <span className="block h-[2px] w-4 rounded-full bg-white/75" />
+                            <span className="block h-[2px] w-4 rounded-full bg-white/75" />
                         </button>
                     </div>
                     <div className="flex-1 overflow-x-auto overflow-y-auto min-h-0">
@@ -1507,6 +1517,26 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
                             currentMode === "notes" ? "intervals" : "notes"
                         )
                     }
+                    bgMode={bgMode}
+                    bgColor={bgColor}
+                    bgAccentColor={bgAccentColor}
+                    boardColor={boardColor}
+                    stringColor={stringColor}
+                    markerColor={markerColor}
+                    fretLabelTextColor={fretLabelTextColor}
+                    noteTextColor={noteTextColor}
+                    playheadColor={playheadColor}
+                    chordDisplayColor={chordDisplayColor}
+                    setBgMode={setBgMode}
+                    setBgColor={setBgColor}
+                    setBgAccentColor={setBgAccentColor}
+                    setBoardColor={setBoardColor}
+                    setStringColor={setStringColor}
+                    setMarkerColor={setMarkerColor}
+                    setFretLabelTextColor={setFretLabelTextColor}
+                    setNoteTextColor={setNoteTextColor}
+                    setPlayheadColor={setPlayheadColor}
+                    setChordDisplayColor={setChordDisplayColor}
                 />
             </div>
         </div>

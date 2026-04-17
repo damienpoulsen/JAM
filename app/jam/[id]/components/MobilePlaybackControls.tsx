@@ -41,18 +41,21 @@ export default function MobilePlaybackControls({
 }: MobilePlaybackControlsProps) {
     return (
         <div
-            className="flex flex-col gap-2 rounded-t-2xl border-t-[1.5px] border-[#f4f4f5] px-4 pt-2 pb-3"
+            className="flex flex-col gap-1.5 rounded-t-2xl border-t-[1.5px] border-[#f4f4f5] px-4 pt-2 pb-3"
             style={{ background: barColor, color: contentColor }}
         >
-            {/* Song name + transport + volume in one row */}
-            <div className="flex items-center gap-2">
-                <span
-                    className="min-w-0 flex-1 truncate text-sm font-semibold"
-                    style={{ fontFamily: "'Rajdhani', sans-serif", letterSpacing: "0.03em" }}
-                >
-                    {songName}
-                </span>
-                <div className="flex shrink-0 items-center gap-5 text-xl">
+            {/* Song name (left) · Transport (center) · Volume (right) */}
+            <div className="flex items-center">
+                <div className="w-[30%] min-w-0">
+                    <span
+                        className="block truncate text-sm font-semibold"
+                        style={{ fontFamily: "'Rajdhani', sans-serif", letterSpacing: "0.03em" }}
+                    >
+                        {songName}
+                    </span>
+                </div>
+
+                <div className="flex flex-1 items-center justify-center gap-8 text-2xl">
                     <button type="button">⏮</button>
                     <button
                         type="button"
@@ -64,12 +67,13 @@ export default function MobilePlaybackControls({
                     </button>
                     <button type="button">⏭</button>
                 </div>
-                <div className="relative shrink-0">
+
+                <div className="relative flex w-[30%] justify-end">
                     <button
                         type="button"
                         onClick={onToggleVolumeOpen}
                         aria-label="Volume"
-                        className="flex h-7 w-7 items-center justify-center opacity-80"
+                        className="flex h-8 w-8 items-center justify-center opacity-80"
                     >
                         <svg
                             viewBox="0 0 24 24"
