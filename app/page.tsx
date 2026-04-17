@@ -30,6 +30,7 @@ export default function Home() {
     top: number;
     left: number;
   } | null>(null);
+  const [mobileNoticeOpen, setMobileNoticeOpen] = useState(true);
 
   const handleUpload = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -124,6 +125,32 @@ export default function Home() {
 
   return (
     <>
+      {/* Mobile desktop notice — only shown on small screens */}
+      {mobileNoticeOpen && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center pb-10 px-6 min-[900px]:hidden">
+          <div
+            className="w-full max-w-sm rounded-2xl border border-white/10 bg-[#0e0e12]/95 px-6 py-5 shadow-[0_24px_60px_rgba(0,0,0,0.6)] backdrop-blur-md"
+          >
+            <p
+              className="mb-1 text-[13px] font-bold uppercase tracking-[0.18em] text-white/50"
+              style={{ fontFamily: "'Rajdhani', sans-serif" }}
+            >
+              Heads up
+            </p>
+            <p className="mb-4 text-[15px] leading-snug text-white/90" style={{ fontFamily: "'Rajdhani', sans-serif" }}>
+              JAM is built for desktop. Mobile works, but for the full experience load it up on a bigger screen.
+            </p>
+            <button
+              type="button"
+              onClick={() => setMobileNoticeOpen(false)}
+              className="w-full rounded-xl bg-white/10 py-2.5 text-[12px] font-semibold uppercase tracking-[0.14em] text-white/80 transition hover:bg-white/15"
+              style={{ fontFamily: "'Rajdhani', sans-serif" }}
+            >
+              Got it
+            </button>
+          </div>
+        </div>
+      )}
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Playfair+Display:ital,wght@0,400;0,600;0,700;0,800;0,900;1,400;1,700&family=Lora:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Courier+Prime:ital,wght@0,400;0,700;1,400&display=swap');
 

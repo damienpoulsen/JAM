@@ -1441,16 +1441,16 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
                     <span className="block h-[2px] w-4 rounded-full bg-white/75" />
                 </button>
 
-                {/* Chord display — top ~28%, centered */}
-                <div className="flex h-[28%] flex-col items-center justify-center px-4">
+                {/* Chord display — top ~28%, pushed toward bottom of section */}
+                <div className="flex h-[28%] flex-col items-center justify-end pb-3 px-4">
                     <div
-                        className="text-[clamp(5.5rem,27vw,11rem)] font-bold leading-none text-center drop-shadow-[0_4px_12px_rgba(0,0,0,0.3)]"
+                        className="text-[clamp(6rem,29vw,12rem)] font-bold leading-none text-center drop-shadow-[0_4px_12px_rgba(0,0,0,0.3)]"
                         style={{ color: chordDisplayColor || "#ffffff", fontFamily: "'Playfair Display', serif" }}
                     >
                         {currentChord || "—"}
                     </div>
                     <div
-                        className="mt-2 text-[clamp(2.2rem,11vw,4.5rem)] leading-none text-center"
+                        className="mt-2 text-[clamp(2.4rem,12vw,5rem)] leading-none text-center"
                         style={{ color: chordDisplayColor ? `${chordDisplayColor}66` : "rgba(255,255,255,0.4)", fontFamily: "'Playfair Display', serif" }}
                     >
                         {nextChord || ""}
@@ -1459,24 +1459,18 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
 
                 {/* Fretboard — flex-1, pushed to bottom, horizontal scroll only */}
                 <div className="flex flex-col flex-1 overflow-hidden min-h-0 justify-end pb-2">
-                    {/* Theory layer toggle */}
+                    {/* Theory layer select */}
                     <div className="flex shrink-0 items-center px-3 pb-1">
-                        {(() => {
-                            const primaryLayer = normalizedLayerConfigs[0];
-                            const currentIdx = LAYER_OPTIONS.findIndex(o => o.value === primaryLayer?.kind);
-                            const safeIdx = currentIdx === -1 ? 0 : currentIdx;
-                            const nextIdx = (safeIdx + 1) % LAYER_OPTIONS.length;
-                            return (
-                                <button
-                                    type="button"
-                                    onClick={() => updateLayerConfig("primary", "kind", LAYER_OPTIONS[nextIdx].value)}
-                                    className="rounded-lg border border-white/25 bg-black/50 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.12em]"
-                                    style={{ fontFamily: "'Rajdhani', sans-serif", color: "rgba(255,255,255,0.82)" }}
-                                >
-                                    {LAYER_OPTIONS[safeIdx]?.label ?? "Off"}
-                                </button>
-                            );
-                        })()}
+                        <select
+                            value={normalizedLayerConfigs[0]?.kind ?? "off"}
+                            onChange={(e) => updateLayerConfig("primary", "kind", e.target.value as LayerConfig["kind"])}
+                            className="rounded-lg border border-white/25 bg-black/60 px-2.5 py-1.5 text-[11px] font-bold uppercase tracking-[0.1em] text-white/85 outline-none"
+                            style={{ fontFamily: "'Rajdhani', sans-serif" }}
+                        >
+                            {LAYER_OPTIONS.map((opt) => (
+                                <option key={opt.value} value={opt.value}>{opt.label}</option>
+                            ))}
+                        </select>
                     </div>
                     <div className="overflow-x-auto overflow-y-hidden">
                         <div style={{ minWidth: "200vw" }}>
