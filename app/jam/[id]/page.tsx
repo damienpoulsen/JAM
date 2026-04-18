@@ -725,6 +725,17 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
         }
     };
 
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.code === "Space" && !(e.target instanceof HTMLInputElement) && !(e.target instanceof HTMLTextAreaElement)) {
+                e.preventDefault();
+                togglePlay();
+            }
+        };
+        window.addEventListener("keydown", handleKeyDown);
+        return () => window.removeEventListener("keydown", handleKeyDown);
+    }, [isAudioAvailable, audioURL]);
+
     const toggleLoopMode = () => {
         setLoopMode((currentMode) => {
             if (currentMode) {
