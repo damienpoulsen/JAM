@@ -93,7 +93,8 @@ export default function Home() {
     if (!file) return;
 
     const id = crypto.randomUUID();
-    const cleanName = file.name.replace(/\.mp3$/i, "").replace(/_/g, " ").trim();
+    const isVideo = file.type.startsWith("video/");
+    const cleanName = file.name.replace(/\.(mp3|mp4)$/i, "").replace(/_/g, " ").trim();
     const pendingSong: Song = {
       id,
       fileId: id,
@@ -101,6 +102,7 @@ export default function Home() {
       key: "Unknown",
       bpm: "--",
       analysisStatus: "pending",
+      hasVideo: isVideo || undefined,
     };
     const updatedSongs = [pendingSong, ...readSongs()];
 
@@ -445,7 +447,7 @@ export default function Home() {
             <div className="mb-2 -mt-[40px] flex justify-center">
               <input
                 type="file"
-                accept=".mp3"
+                accept=".mp3,.mp4"
                 id="fileUpload"
                 className="hidden"
                 onChange={handleUpload}

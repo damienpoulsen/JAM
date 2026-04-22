@@ -9,6 +9,7 @@ import Fretboard from "./components/Fretboard";
 import LeftMenuPanel from "./components/LeftMenuPanel";
 import OnboardingTour from "./components/OnboardingTour";
 import OverlayControls from "./components/OverlayControls";
+import VideoPanel from "./components/VideoPanel";
 import PlaybackControls from "./components/PlaybackControls";
 import MobileFretboardSettings from "./components/MobileFretboardSettings";
 import MobilePlaybackControls from "./components/MobilePlaybackControls";
@@ -294,6 +295,7 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
         }
     }, []);
     const audioRef = useRef<HTMLAudioElement | null>(null);
+    const videoRef = useRef<HTMLVideoElement | null>(null);
     const metronomeAudioContextRef = useRef<AudioContext | null>(null);
     const metronomeBufferRef = useRef<AudioBuffer | null>(null);
     const metronomeIntervalRef = useRef<number | null>(null);
@@ -302,6 +304,8 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
 
     const [songDrafts, setSongDrafts] = useState<Record<string, Song>>({});
     const [audioURL, setAudioURL] = useState("");
+    const [videoURL, setVideoURL] = useState<string | null>(null);
+    const [videoMode, setVideoMode] = useState(false);
     const [loadedFileId, setLoadedFileId] = useState("");
     const [audioError, setAudioError] = useState("");
     const [isPlaying, setIsPlaying] = useState(false);
@@ -553,6 +557,7 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
         }
 
         let url = "";
+        let videoObjectUrl = "";
         let active = true;
         const targetFileId = song.fileId;
 
@@ -566,6 +571,8 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
                 if (!file) {
                     setLoadedFileId(targetFileId);
                     setAudioURL("");
+                    setVideoURL(null);
+                    setVideoMode(false);
                     setAudioError("Audio file is unavailable for this song.");
                     return;
                 }
@@ -574,6 +581,14 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
                 setLoadedFileId(targetFileId);
                 setAudioURL(url);
                 setAudioError("");
+
+                if (file.type.startsWith("video/")) {
+                    videoObjectUrl = URL.createObjectURL(file);
+                    setVideoURL(videoObjectUrl);
+                } else {
+                    setVideoURL(null);
+                    setVideoMode(false);
+                }
             } catch (error) {
                 console.error("Failed to load audio file", error);
                 if (!active) {
@@ -582,6 +597,8 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
 
                 setLoadedFileId(targetFileId);
                 setAudioURL("");
+                setVideoURL(null);
+                setVideoMode(false);
                 setAudioError("Audio file could not be loaded.");
             }
         };
@@ -593,11 +610,15 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
             if (url) {
                 URL.revokeObjectURL(url);
             }
+            if (videoObjectUrl) {
+                URL.revokeObjectURL(videoObjectUrl);
+            }
         };
     }, [song.fileId]);
 
     // Audio element events drive the transport, chord timing, and playhead UI.
     useEffect(() => {
+        if (videoMode) return; // Video element handles transport in video mode
         const audio = audioRef.current;
         if (!audio) {
             return;
@@ -642,7 +663,53 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
             audio.removeEventListener("emptied", onSourceReset);
             audio.removeEventListener("loadstart", onSourceReset);
         };
-    }, [audioURL]);
+    }, [audioURL, videoMode]);
+
+    // Video element events — mirrors the audio effect, active only in video mode.
+    useEffect(() => {
+        if (!videoMode) return;
+        const video = videoRef.current;
+        if (!video) return;
+
+        const updateTime = () => setCurrentTime(video.currentTime);
+        const setMeta = () => setDuration(Number.isFinite(video.duration) ? video.duration : 0);
+        const onPlay = () => setIsPlaying(true);
+        const onPause = () => setIsPlaying(false);
+        const onSeek = () => setCurrentTime(video.currentTime);
+        const onEnded = () => {
+            setIsPlaying(false);
+            setCurrentTime(video.duration || 0);
+        };
+        const onSourceReset = () => {
+            setIsPlaying(false);
+            setCurrentTime(0);
+            setDuration(0);
+        };
+
+        video.addEventListener("timeupdate", updateTime);
+        video.addEventListener("loadedmetadata", setMeta);
+        video.addEventListener("durationchange", setMeta);
+        video.addEventListener("play", onPlay);
+        video.addEventListener("pause", onPause);
+        video.addEventListener("seeking", onSeek);
+        video.addEventListener("seeked", onSeek);
+        video.addEventListener("ended", onEnded);
+        video.addEventListener("emptied", onSourceReset);
+        video.addEventListener("loadstart", onSourceReset);
+
+        return () => {
+            video.removeEventListener("timeupdate", updateTime);
+            video.removeEventListener("loadedmetadata", setMeta);
+            video.removeEventListener("durationchange", setMeta);
+            video.removeEventListener("play", onPlay);
+            video.removeEventListener("pause", onPause);
+            video.removeEventListener("seeking", onSeek);
+            video.removeEventListener("seeked", onSeek);
+            video.removeEventListener("ended", onEnded);
+            video.removeEventListener("emptied", onSourceReset);
+            video.removeEventListener("loadstart", onSourceReset);
+        };
+    }, [videoMode, videoURL]);
 
     useEffect(() => {
         if (!isPlaying) {
@@ -652,12 +719,12 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
         let frameId = 0;
 
         const syncPlaybackTime = () => {
-            const audio = audioRef.current;
-            if (!audio) {
+            const source = videoRef.current ?? audioRef.current;
+            if (!source) {
                 return;
             }
 
-            setCurrentTime(audio.currentTime);
+            setCurrentTime(source.currentTime);
             frameId = window.requestAnimationFrame(syncPlaybackTime);
         };
 
@@ -670,12 +737,10 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
 
     useEffect(() => {
         const audio = audioRef.current;
-        if (!audio) {
-            return;
-        }
-
-        audio.playbackRate = playbackRate;
-    }, [playbackRate, audioURL]);
+        if (audio) audio.playbackRate = playbackRate;
+        const video = videoRef.current;
+        if (video) video.playbackRate = playbackRate;
+    }, [playbackRate, audioURL, videoURL]);
 
     useEffect(() => {
         const audio = audioRef.current;
@@ -772,15 +837,15 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
     }, [voxRemoval, instrumentalURL, audioURL, song.fileId]);
 
     const togglePlay = () => {
-        const audio = audioRef.current;
-        if (!audio || !isAudioAvailable) {
+        const transport = videoRef.current ?? audioRef.current;
+        if (!transport || !isAudioAvailable) {
             return;
         }
 
-        if (audio.paused) {
-            void audio.play();
+        if (transport.paused) {
+            void transport.play();
         } else {
-            audio.pause();
+            transport.pause();
         }
     };
 
@@ -800,7 +865,7 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
         };
         window.addEventListener("keydown", handleKeyDown);
         return () => window.removeEventListener("keydown", handleKeyDown);
-    }, [isAudioAvailable, audioURL]);
+    }, [isAudioAvailable, audioURL, videoMode]);
 
     const toggleLoopMode = () => {
         setLoopMode((currentMode) => {
@@ -811,6 +876,26 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
 
             return !currentMode;
         });
+    };
+
+    const enterVideoMode = () => {
+        audioRef.current?.pause();
+        setVideoMode(true);
+    };
+
+    const exitVideoMode = () => {
+        const video = videoRef.current;
+        const audio = audioRef.current;
+        const savedTime = video?.currentTime ?? 0;
+        video?.pause();
+        if (audio) {
+            skipAudioResetRef.current = true;
+            audio.addEventListener("canplay", () => {
+                skipAudioResetRef.current = false;
+                audio.currentTime = savedTime;
+            }, { once: true });
+        }
+        setVideoMode(false);
     };
 
     const loadMetronomeBuffer = useCallback(async () => {
@@ -909,13 +994,13 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
         let frameId = 0;
 
         const syncLoop = () => {
-            const audio = audioRef.current;
-            if (!audio) {
+            const transport = videoRef.current ?? audioRef.current;
+            if (!transport) {
                 return;
             }
 
-            if (audio.currentTime >= loopRange.end) {
-                audio.currentTime = loopRange.start;
+            if (transport.currentTime >= loopRange.end) {
+                transport.currentTime = loopRange.start;
                 setCurrentTime(loopRange.start);
             }
 
@@ -928,6 +1013,31 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
             window.cancelAnimationFrame(frameId);
         };
     }, [isPlaying, loopMode, loopRange]);
+
+    // When VOX is active in video mode, keep the instrumental audio in sync with the video.
+    useEffect(() => {
+        if (!videoMode || !voxRemoval || !instrumentalURL) return;
+        const video = videoRef.current;
+        const audio = audioRef.current;
+        if (!video || !audio) return;
+
+        const syncOnSeek = () => { audio.currentTime = video.currentTime; };
+        const syncOnPlay = () => {
+            audio.currentTime = video.currentTime;
+            void audio.play().catch(() => undefined);
+        };
+        const syncOnPause = () => { audio.pause(); };
+
+        video.addEventListener("seeked", syncOnSeek);
+        video.addEventListener("play", syncOnPlay);
+        video.addEventListener("pause", syncOnPause);
+
+        return () => {
+            video.removeEventListener("seeked", syncOnSeek);
+            video.removeEventListener("play", syncOnPlay);
+            video.removeEventListener("pause", syncOnPause);
+        };
+    }, [videoMode, voxRemoval, instrumentalURL, videoURL]);
 
     const isDarkPanel = panelTextMode === "dark";
     const panel = {
@@ -957,7 +1067,11 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
                     }}
                 />
             )}
-            <audio key={`${id}:${song.fileId || "no-file"}`} ref={audioRef} src={voxRemoval && instrumentalURL ? instrumentalURL : (isAudioAvailable ? audioURL : undefined)} />
+            <audio key={`${id}:${song.fileId || "no-file"}`} ref={audioRef} src={
+                videoMode
+                    ? (voxRemoval && instrumentalURL ? instrumentalURL : undefined)
+                    : (voxRemoval && instrumentalURL ? instrumentalURL : (isAudioAvailable ? audioURL : undefined))
+            } />
 
             {/* Backdrop for right customization panel */}
             {panelOpen && (
@@ -1278,73 +1392,129 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
                         </div>
                     ) : (
                         <>
-                            <div style={{ backgroundColor: "transparent" }}>
-                            <ChordDisplay
-                                isDark={true}
-                                chordTextColor={chordDisplayColor}
-                                bpm={displayBpm}
-                                currentChord={currentChord}
-                                keyOpen={keyOpen}
-                                keyOptions={keyOptions}
-                                nextChord={nextChord}
-                                onBpmChange={(nextValue) => {
-                                    updateSong({
-                                        bpm: nextValue,
-                                    });
-                                }}
-                                onKeySelect={(keyOption) => {
-                                    updateSong({ key: keyOption });
-                                    setKeyOpen(false);
-                                }}
-                                onToggleKeyOpen={() => setKeyOpen(!keyOpen)}
-                                songKey={song.key}
-                            />
-                            </div>
-
-                            <div className="-mt-5 flex flex-col">
-
-                                <div className="-mt-5 flex flex-col">
-                                    <OverlayControls
-                                        barColor={controlCenterColor}
-                                        audioError={visibleAudioError}
-                                        theorySettings={theorySettings}
-                                        onTheoryChange={setTheorySettings}
-                                        loopMode={loopMode}
-                                        metronomeBpm={metronomeBpm}
-                                        metronomeEnabled={metronomeEnabled}
-                                        metronomeOpen={metronomeOpen}
-                                        noteDisplayMode={noteDisplayMode}
-                                        onDecreaseTempo={() => updatePlaybackRate(playbackRate - 0.1)}
-                                        onIncreaseTempo={() => updatePlaybackRate(playbackRate + 0.1)}
-                                        onDecreaseMetronomeBpm={() =>
-                                            setMetronomeBpmOverride({
-                                                songId: id,
-                                                bpm: Math.max(30, metronomeBpm - 1),
-                                            })
+                            {/* Top section: VideoPanel in video mode, ChordDisplay otherwise */}
+                            {videoMode && videoURL ? (
+                                <div className="mb-2">
+                                    <VideoPanel
+                                        videoRef={videoRef}
+                                        videoURL={videoURL}
+                                        currentChord={currentChord}
+                                        nextChord={nextChord}
+                                        chordTextColor={chordDisplayColor}
+                                        muted={voxRemoval && !!instrumentalURL}
+                                        overlayControls={
+                                            <OverlayControls
+                                                barColor={controlCenterColor}
+                                                audioError={visibleAudioError}
+                                                theorySettings={theorySettings}
+                                                onTheoryChange={setTheorySettings}
+                                                loopMode={loopMode}
+                                                metronomeBpm={metronomeBpm}
+                                                metronomeEnabled={metronomeEnabled}
+                                                metronomeOpen={metronomeOpen}
+                                                noteDisplayMode={noteDisplayMode}
+                                                onDecreaseTempo={() => updatePlaybackRate(playbackRate - 0.1)}
+                                                onIncreaseTempo={() => updatePlaybackRate(playbackRate + 0.1)}
+                                                onDecreaseMetronomeBpm={() => setMetronomeBpmOverride({ songId: id, bpm: Math.max(30, metronomeBpm - 1) })}
+                                                onTempoDisplayModeChange={setTempoDisplayMode}
+                                                onIncreaseMetronomeBpm={() => setMetronomeBpmOverride({ songId: id, bpm: Math.min(260, metronomeBpm + 1) })}
+                                                onToggleLoopMode={toggleLoopMode}
+                                                onToggleMetronome={() => setMetronomeEnabled((current) => !current)}
+                                                onToggleMetronomeOpen={() => setMetronomeOpen((current) => !current)}
+                                                onToggleNoteDisplayMode={() => setNoteDisplayMode((currentMode) => currentMode === "notes" ? "intervals" : "notes")}
+                                                voxRemoval={voxRemoval}
+                                                voxLoading={voxLoading}
+                                                voxError={voxError}
+                                                onToggleVoxRemoval={() => { void toggleVoxRemoval(); }}
+                                                playbackRate={playbackRate}
+                                                tempoDisplayMode={tempoDisplayMode}
+                                                baseBpm={displayBpm === "--" ? null : typeof displayBpm === "number" ? displayBpm : Number(displayBpm) || null}
+                                            />
                                         }
-                                        onTempoDisplayModeChange={setTempoDisplayMode}
-                                        onIncreaseMetronomeBpm={() =>
-                                            setMetronomeBpmOverride({
-                                                songId: id,
-                                                bpm: Math.min(260, metronomeBpm + 1),
-                                            })
-                                        }
-                                        onToggleLoopMode={toggleLoopMode}
-                                        onToggleMetronome={() => setMetronomeEnabled((current) => !current)}
-                                        onToggleMetronomeOpen={() => setMetronomeOpen((current) => !current)}
-                                        onToggleNoteDisplayMode={() =>
-                                            setNoteDisplayMode((currentMode) =>
-                                                currentMode === "notes" ? "intervals" : "notes"
-                                            )
-                                        }
-                                        voxRemoval={voxRemoval}
-                                        voxLoading={voxLoading}
-                                        voxError={voxError}
-                                        onToggleVoxRemoval={() => { void toggleVoxRemoval(); }}
-                                        playbackRate={playbackRate}
-                                        tempoDisplayMode={tempoDisplayMode}
-                                        baseBpm={displayBpm === "--" ? null : typeof displayBpm === "number" ? displayBpm : Number(displayBpm) || null}
+                                        onExitVideoMode={exitVideoMode}
                                     />
+                                </div>
+                            ) : (
+                                <div style={{ backgroundColor: "transparent" }}>
+                                    <ChordDisplay
+                                        isDark={true}
+                                        chordTextColor={chordDisplayColor}
+                                        bpm={displayBpm}
+                                        currentChord={currentChord}
+                                        keyOpen={keyOpen}
+                                        keyOptions={keyOptions}
+                                        nextChord={nextChord}
+                                        onBpmChange={(nextValue) => { updateSong({ bpm: nextValue }); }}
+                                        onKeySelect={(keyOption) => { updateSong({ key: keyOption }); setKeyOpen(false); }}
+                                        onToggleKeyOpen={() => setKeyOpen(!keyOpen)}
+                                        songKey={song.key}
+                                    />
+                                </div>
+                            )}
+
+                            {/* Fretboard + controls — always visible */}
+                            <div className="-mt-5 flex flex-col">
+                                <div className="-mt-5 flex flex-col">
+                                    {!videoMode && (
+                                        <>
+                                            <OverlayControls
+                                                barColor={controlCenterColor}
+                                                audioError={visibleAudioError}
+                                                theorySettings={theorySettings}
+                                                onTheoryChange={setTheorySettings}
+                                                loopMode={loopMode}
+                                                metronomeBpm={metronomeBpm}
+                                                metronomeEnabled={metronomeEnabled}
+                                                metronomeOpen={metronomeOpen}
+                                                noteDisplayMode={noteDisplayMode}
+                                                onDecreaseTempo={() => updatePlaybackRate(playbackRate - 0.1)}
+                                                onIncreaseTempo={() => updatePlaybackRate(playbackRate + 0.1)}
+                                                onDecreaseMetronomeBpm={() =>
+                                                    setMetronomeBpmOverride({
+                                                        songId: id,
+                                                        bpm: Math.max(30, metronomeBpm - 1),
+                                                    })
+                                                }
+                                                onTempoDisplayModeChange={setTempoDisplayMode}
+                                                onIncreaseMetronomeBpm={() =>
+                                                    setMetronomeBpmOverride({
+                                                        songId: id,
+                                                        bpm: Math.min(260, metronomeBpm + 1),
+                                                    })
+                                                }
+                                                onToggleLoopMode={toggleLoopMode}
+                                                onToggleMetronome={() => setMetronomeEnabled((current) => !current)}
+                                                onToggleMetronomeOpen={() => setMetronomeOpen((current) => !current)}
+                                                onToggleNoteDisplayMode={() =>
+                                                    setNoteDisplayMode((currentMode) =>
+                                                        currentMode === "notes" ? "intervals" : "notes"
+                                                    )
+                                                }
+                                                voxRemoval={voxRemoval}
+                                                voxLoading={voxLoading}
+                                                voxError={voxError}
+                                                onToggleVoxRemoval={() => { void toggleVoxRemoval(); }}
+                                                playbackRate={playbackRate}
+                                                tempoDisplayMode={tempoDisplayMode}
+                                                baseBpm={displayBpm === "--" ? null : typeof displayBpm === "number" ? displayBpm : Number(displayBpm) || null}
+                                            />
+                                            {videoURL && (
+                                                <div className="flex justify-end px-1 mt-1">
+                                                    <button
+                                                        type="button"
+                                                        onClick={enterVideoMode}
+                                                        className="flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] uppercase tracking-widest border transition-colors"
+                                                        style={{ color: "rgba(255,255,255,0.45)", borderColor: "rgba(255,255,255,0.12)" }}
+                                                        onMouseEnter={e => { e.currentTarget.style.color = "rgba(255,255,255,0.75)"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.28)"; }}
+                                                        onMouseLeave={e => { e.currentTarget.style.color = "rgba(255,255,255,0.45)"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.12)"; }}
+                                                    >
+                                                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
+                                                        Video
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </>
+                                    )}
 
                                     <div data-tour="fretboard">
                                     <Fretboard
@@ -1478,8 +1648,9 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
 
                                                         if (currentDraft && currentDraft.end - currentDraft.start >= 0.15) {
                                                             setLoopRange(currentDraft);
-                                                            if (audio) {
-                                                                audio.currentTime = currentDraft.start;
+                                                            const loopTransport = videoRef.current ?? audio;
+                                                            if (loopTransport) {
+                                                                loopTransport.currentTime = currentDraft.start;
                                                             }
                                                             setCurrentTime(currentDraft.start);
                                                         } else {
@@ -1504,11 +1675,11 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
                                             };
 
                                             const move = (mouseEvent: MouseEvent) => {
-                                                const audio = audioRef.current;
-                                                if (!audio) return;
+                                                const transport = videoRef.current ?? audioRef.current;
+                                                if (!transport) return;
 
                                                 const nextTime = getClampedTime(mouseEvent.clientX);
-                                                audio.currentTime = nextTime;
+                                                transport.currentTime = nextTime;
                                                 setCurrentTime(nextTime);
                                             };
 

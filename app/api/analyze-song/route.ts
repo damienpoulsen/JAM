@@ -112,7 +112,8 @@ async function runRemoteAnalyzer(
     formData.append("songId", songId);
     formData.append("detectChords", String(options.detectChords));
     formData.append("skipBpm", String(Boolean(options.skipBpm)));
-    formData.append("file", requestFile, requestFile.name || "track.mp3");
+    const ext = requestFile.name?.split(".").pop() || "mp3";
+    formData.append("file", requestFile, requestFile.name || `track.${ext}`);
 
     const response = await fetch(`${analysisApiUrl.replace(/\/$/, "")}/analyze`, {
         method: "POST",
