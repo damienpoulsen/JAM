@@ -21,6 +21,7 @@ from analyze_song import (  # noqa: E402
     CURRENT_ANALYSIS_VERSION,
     analyze_bpm_and_beats,
     detect_chord_events,
+    snap_chord_events_to_beats,
 )
 
 app = FastAPI(title="JAM Analysis Service")
@@ -64,14 +65,17 @@ async def analyze(
         should_skip_bpm = str(skipBpm).lower() == "true"
 
         if should_skip_bpm:
-            bpm, beat_start_time = None, None
+            bpm, beat_start_time, beat_times = None, None, []
         else:
-            bpm, beat_start_time = analyze_bpm_and_beats(temp_path)
+            bpm, beat_start_time, beat_times = analyze_bpm_and_beats(temp_path)
 
         chord_events, detected_key = detect_chord_events(
             audio_path=temp_path,
             detect_chords=should_detect_chords,
         )
+
+        if chord_events and len(beat_times) >= 2 and bpm is not None:
+            chord_events = snap_chord_events_to_beats(chord_events, beat_times, bpm)
 
         return JSONResponse(
             {

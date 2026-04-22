@@ -22,6 +22,7 @@ async function runAnalyzer(
     options: {
         detectChords: boolean;
         skipBpm?: boolean;
+        stemMode?: string;
     }
 ): Promise<ScriptAnalysis> {
     const scriptPath = join(process.cwd(), "scripts", "analyze_song.py");
@@ -36,7 +37,14 @@ async function runAnalyzer(
         args.push("--skip-bpm");
     }
 
+    if (options.stemMode) {
+        args.push("--stem-mode", options.stemMode);
+    }
+
+    // Prefer the dedicated analysis venv (Python 3.11 + madmom) when present.
+    const venvPython = join(process.cwd(), "analysis-service", ".venv", "Scripts", "python.exe");
     const commands = [
+        [venvPython, args],
         ["python", args],
         ["py", args],
     ] as const;
@@ -133,6 +141,7 @@ export async function POST(request: Request) {
     const file = formData.get("file");
     const detectChords = formData.get("detectChords") === "true";
     const skipBpm = formData.get("skipBpm") === "true";
+    const stemMode = formData.get("stemMode")?.toString() ?? "demucs";
 
     if (typeof songId !== "string" || !songId.trim()) {
         return Response.json({ error: "Missing songId" }, { status: 400 });
@@ -160,6 +169,7 @@ export async function POST(request: Request) {
             analysis = await runAnalyzer(songId, tempFilePath, {
                 detectChords,
                 skipBpm,
+                stemMode,
             });
         }
 

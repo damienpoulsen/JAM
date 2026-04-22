@@ -1,0 +1,682 @@
+{
+  "songId": "demo-wonderwall",
+  "bpm": 87.0,
+  "beatStartTime": 0.63,
+  "detectedKey": "F#m",
+  "chordEvents": [
+    {
+      "time": 0.63,
+      "chord": "F#m"
+    },
+    {
+      "time": 2.395,
+      "chord": "A"
+    },
+    {
+      "time": 3.553,
+      "chord": "E"
+    },
+    {
+      "time": 4.405,
+      "chord": "Bm"
+    },
+    {
+      "time": 6.11,
+      "chord": "F#m"
+    },
+    {
+      "time": 7.835,
+      "chord": "A"
+    },
+    {
+      "time": 9.102,
+      "chord": "E"
+    },
+    {
+      "time": 10.066,
+      "chord": "Bm"
+    },
+    {
+      "time": 11.61,
+      "chord": "F#m"
+    },
+    {
+      "time": 13.189,
+      "chord": "A"
+    },
+    {
+      "time": 14.715,
+      "chord": "E"
+    },
+    {
+      "time": 15.405,
+      "chord": "Bm"
+    },
+    {
+      "time": 17.0,
+      "chord": "F#m"
+    },
+    {
+      "time": 18.855,
+      "chord": "A"
+    },
+    {
+      "time": 20.235,
+      "chord": "E"
+    },
+    {
+      "time": 21.084,
+      "chord": "Bm"
+    },
+    {
+      "time": 22.5,
+      "chord": "F#m"
+    },
+    {
+      "time": 24.288,
+      "chord": "A"
+    },
+    {
+      "time": 25.635,
+      "chord": "E"
+    },
+    {
+      "time": 26.668,
+      "chord": "Bm"
+    },
+    {
+      "time": 28.14,
+      "chord": "F#m"
+    },
+    {
+      "time": 29.875,
+      "chord": "A"
+    },
+    {
+      "time": 31.5,
+      "chord": "E"
+    },
+    {
+      "time": 32.136,
+      "chord": "Bm"
+    },
+    {
+      "time": 33.5,
+      "chord": "F#m"
+    },
+    {
+      "time": 34.969,
+      "chord": "A"
+    },
+    {
+      "time": 36.785,
+      "chord": "E"
+    },
+    {
+      "time": 37.465,
+      "chord": "Bm"
+    },
+    {
+      "time": 38.383,
+      "chord": "A"
+    },
+    {
+      "time": 39.16,
+      "chord": "D"
+    },
+    {
+      "time": 40.391,
+      "chord": "E"
+    },
+    {
+      "time": 41.92,
+      "chord": "Bm"
+    },
+    {
+      "time": 44.547,
+      "chord": "F#m"
+    },
+    {
+      "time": 46.385,
+      "chord": "A"
+    },
+    {
+      "time": 47.7,
+      "chord": "E"
+    },
+    {
+      "time": 48.84,
+      "chord": "Bm"
+    },
+    {
+      "time": 50.434,
+      "chord": "F#m"
+    },
+    {
+      "time": 51.59,
+      "chord": "A"
+    },
+    {
+      "time": 52.96,
+      "chord": "E"
+    },
+    {
+      "time": 54.34,
+      "chord": "Bm"
+    },
+    {
+      "time": 56.035,
+      "chord": "F#m"
+    },
+    {
+      "time": 57.33,
+      "chord": "A"
+    },
+    {
+      "time": 58.845,
+      "chord": "E"
+    },
+    {
+      "time": 59.535,
+      "chord": "Bm"
+    },
+    {
+      "time": 61.575,
+      "chord": "F#m"
+    },
+    {
+      "time": 62.845,
+      "chord": "A"
+    },
+    {
+      "time": 64.192,
+      "chord": "E"
+    },
+    {
+      "time": 65.236,
+      "chord": "Bm"
+    },
+    {
+      "time": 66.72,
+      "chord": "D"
+    },
+    {
+      "time": 68.12,
+      "chord": "E"
+    },
+    {
+      "time": 69.7,
+      "chord": "F#m"
+    },
+    {
+      "time": 72.469,
+      "chord": "D"
+    },
+    {
+      "time": 73.63,
+      "chord": "E"
+    },
+    {
+      "time": 75.02,
+      "chord": "F#m"
+    },
+    {
+      "time": 77.76,
+      "chord": "D"
+    },
+    {
+      "time": 79.16,
+      "chord": "E"
+    },
+    {
+      "time": 80.52,
+      "chord": "A"
+    },
+    {
+      "time": 81.93,
+      "chord": "F#m"
+    },
+    {
+      "time": 82.955,
+      "chord": "A"
+    },
+    {
+      "time": 83.569,
+      "chord": "Bm"
+    },
+    {
+      "time": 88.8,
+      "chord": "D"
+    },
+    {
+      "time": 90.19,
+      "chord": "F#m"
+    },
+    {
+      "time": 91.945,
+      "chord": "A"
+    },
+    {
+      "time": 92.96,
+      "chord": "F#m"
+    },
+    {
+      "time": 94.32,
+      "chord": "D"
+    },
+    {
+      "time": 95.9,
+      "chord": "F#m"
+    },
+    {
+      "time": 97.07,
+      "chord": "A"
+    },
+    {
+      "time": 98.7,
+      "chord": "F#m"
+    },
+    {
+      "time": 99.83,
+      "chord": "D"
+    },
+    {
+      "time": 101.5,
+      "chord": "F#m"
+    },
+    {
+      "time": 102.795,
+      "chord": "A"
+    },
+    {
+      "time": 104.176,
+      "chord": "F#m"
+    },
+    {
+      "time": 105.5,
+      "chord": "D"
+    },
+    {
+      "time": 107.085,
+      "chord": "F#m"
+    },
+    {
+      "time": 108.275,
+      "chord": "A"
+    },
+    {
+      "time": 109.49,
+      "chord": "F#m"
+    },
+    {
+      "time": 116.755,
+      "chord": "A"
+    },
+    {
+      "time": 117.79,
+      "chord": "E"
+    },
+    {
+      "time": 119.18,
+      "chord": "Bm"
+    },
+    {
+      "time": 120.697,
+      "chord": "F#m"
+    },
+    {
+      "time": 122.265,
+      "chord": "A"
+    },
+    {
+      "time": 123.53,
+      "chord": "E"
+    },
+    {
+      "time": 124.68,
+      "chord": "Bm"
+    },
+    {
+      "time": 126.04,
+      "chord": "F#m"
+    },
+    {
+      "time": 127.785,
+      "chord": "A"
+    },
+    {
+      "time": 129.175,
+      "chord": "E"
+    },
+    {
+      "time": 130.21,
+      "chord": "Bm"
+    },
+    {
+      "time": 131.57,
+      "chord": "F#m"
+    },
+    {
+      "time": 133.178,
+      "chord": "A"
+    },
+    {
+      "time": 134.571,
+      "chord": "E"
+    },
+    {
+      "time": 135.72,
+      "chord": "Bm"
+    },
+    {
+      "time": 137.08,
+      "chord": "D"
+    },
+    {
+      "time": 138.47,
+      "chord": "E"
+    },
+    {
+      "time": 139.85,
+      "chord": "F#m"
+    },
+    {
+      "time": 142.58,
+      "chord": "D"
+    },
+    {
+      "time": 143.98,
+      "chord": "E"
+    },
+    {
+      "time": 145.36,
+      "chord": "F#m"
+    },
+    {
+      "time": 148.435,
+      "chord": "D"
+    },
+    {
+      "time": 149.5,
+      "chord": "E"
+    },
+    {
+      "time": 150.86,
+      "chord": "A"
+    },
+    {
+      "time": 152.26,
+      "chord": "F#m"
+    },
+    {
+      "time": 153.194,
+      "chord": "A"
+    },
+    {
+      "time": 153.844,
+      "chord": "Bm"
+    },
+    {
+      "time": 159.14,
+      "chord": "D"
+    },
+    {
+      "time": 160.7,
+      "chord": "F#m"
+    },
+    {
+      "time": 162.1,
+      "chord": "A"
+    },
+    {
+      "time": 163.5,
+      "chord": "F#m"
+    },
+    {
+      "time": 164.64,
+      "chord": "D"
+    },
+    {
+      "time": 166.04,
+      "chord": "F#m"
+    },
+    {
+      "time": 167.66,
+      "chord": "A"
+    },
+    {
+      "time": 169.165,
+      "chord": "F#m"
+    },
+    {
+      "time": 170.2,
+      "chord": "D"
+    },
+    {
+      "time": 171.925,
+      "chord": "F#m"
+    },
+    {
+      "time": 173.1,
+      "chord": "A"
+    },
+    {
+      "time": 174.521,
+      "chord": "F#m"
+    },
+    {
+      "time": 175.68,
+      "chord": "D"
+    },
+    {
+      "time": 177.3,
+      "chord": "F#m"
+    },
+    {
+      "time": 178.44,
+      "chord": "A"
+    },
+    {
+      "time": 179.978,
+      "chord": "F#m"
+    },
+    {
+      "time": 181.19,
+      "chord": "D"
+    },
+    {
+      "time": 182.935,
+      "chord": "F#m"
+    },
+    {
+      "time": 184.111,
+      "chord": "A"
+    },
+    {
+      "time": 185.562,
+      "chord": "F#m"
+    },
+    {
+      "time": 186.71,
+      "chord": "D"
+    },
+    {
+      "time": 188.3,
+      "chord": "F#m"
+    },
+    {
+      "time": 189.661,
+      "chord": "A"
+    },
+    {
+      "time": 191.089,
+      "chord": "F#m"
+    },
+    {
+      "time": 192.575,
+      "chord": "D"
+    },
+    {
+      "time": 193.965,
+      "chord": "F#m"
+    },
+    {
+      "time": 195.2,
+      "chord": "A"
+    },
+    {
+      "time": 196.545,
+      "chord": "F#m"
+    },
+    {
+      "time": 197.77,
+      "chord": "D"
+    },
+    {
+      "time": 199.15,
+      "chord": "F#m"
+    },
+    {
+      "time": 200.875,
+      "chord": "A"
+    },
+    {
+      "time": 202.1,
+      "chord": "F#m"
+    },
+    {
+      "time": 203.24,
+      "chord": "D"
+    },
+    {
+      "time": 204.87,
+      "chord": "F#m"
+    },
+    {
+      "time": 206.274,
+      "chord": "A"
+    },
+    {
+      "time": 207.552,
+      "chord": "F#m"
+    },
+    {
+      "time": 209.0,
+      "chord": "D"
+    },
+    {
+      "time": 210.16,
+      "chord": "F#m"
+    },
+    {
+      "time": 211.885,
+      "chord": "A"
+    },
+    {
+      "time": 213.136,
+      "chord": "F#m"
+    },
+    {
+      "time": 214.5,
+      "chord": "D"
+    },
+    {
+      "time": 215.818,
+      "chord": "F#m"
+    },
+    {
+      "time": 217.281,
+      "chord": "A"
+    },
+    {
+      "time": 218.6,
+      "chord": "F#m"
+    },
+    {
+      "time": 219.8,
+      "chord": "D"
+    },
+    {
+      "time": 221.2,
+      "chord": "F#m"
+    },
+    {
+      "time": 222.57,
+      "chord": "A"
+    },
+    {
+      "time": 224.177,
+      "chord": "F#m"
+    },
+    {
+      "time": 225.33,
+      "chord": "D"
+    },
+    {
+      "time": 226.894,
+      "chord": "F#m"
+    },
+    {
+      "time": 228.3,
+      "chord": "A"
+    },
+    {
+      "time": 229.7,
+      "chord": "F#m"
+    },
+    {
+      "time": 230.8,
+      "chord": "D"
+    },
+    {
+      "time": 232.5,
+      "chord": "F#m"
+    },
+    {
+      "time": 233.825,
+      "chord": "A"
+    },
+    {
+      "time": 235.23,
+      "chord": "F#m"
+    },
+    {
+      "time": 236.36,
+      "chord": "D"
+    },
+    {
+      "time": 238.085,
+      "chord": "F#m"
+    },
+    {
+      "time": 239.3,
+      "chord": "A"
+    },
+    {
+      "time": 240.49,
+      "chord": "F#m"
+    },
+    {
+      "time": 241.86,
+      "chord": "D"
+    },
+    {
+      "time": 243.798,
+      "chord": "F#m"
+    },
+    {
+      "time": 244.796,
+      "chord": "A"
+    },
+    {
+      "time": 245.625,
+      "chord": "F#m"
+    },
+    {
+      "time": 255.68,
+      "chord": "A"
+    }
+  ],
+  "source": "ai",
+  "version": 3
+}

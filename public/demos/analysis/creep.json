@@ -1,0 +1,178 @@
+{
+  "songId": "demo-creep",
+  "bpm": 92.3,
+  "beatStartTime": 0.23,
+  "detectedKey": "G",
+  "chordEvents": [
+    {
+      "time": 1.49,
+      "chord": "G"
+    },
+    {
+      "time": 6.835,
+      "chord": "Bm"
+    },
+    {
+      "time": 11.49,
+      "chord": "C"
+    },
+    {
+      "time": 21.0,
+      "chord": "F"
+    },
+    {
+      "time": 21.64,
+      "chord": "G"
+    },
+    {
+      "time": 26.77,
+      "chord": "Bm"
+    },
+    {
+      "time": 31.9,
+      "chord": "C"
+    },
+    {
+      "time": 40.88,
+      "chord": "D#"
+    },
+    {
+      "time": 41.7,
+      "chord": "F"
+    },
+    {
+      "time": 42.19,
+      "chord": "G"
+    },
+    {
+      "time": 47.35,
+      "chord": "Bm"
+    },
+    {
+      "time": 52.55,
+      "chord": "C"
+    },
+    {
+      "time": 61.355,
+      "chord": "D#"
+    },
+    {
+      "time": 62.31,
+      "chord": "F"
+    },
+    {
+      "time": 62.635,
+      "chord": "G"
+    },
+    {
+      "time": 68.22,
+      "chord": "Bm"
+    },
+    {
+      "time": 73.45,
+      "chord": "C"
+    },
+    {
+      "time": 81.94,
+      "chord": "F"
+    },
+    {
+      "time": 83.595,
+      "chord": "G"
+    },
+    {
+      "time": 89.1,
+      "chord": "Bm"
+    },
+    {
+      "time": 94.34,
+      "chord": "C"
+    },
+    {
+      "time": 103.77,
+      "chord": "Fm"
+    },
+    {
+      "time": 104.84,
+      "chord": "G"
+    },
+    {
+      "time": 110.13,
+      "chord": "Bm"
+    },
+    {
+      "time": 115.35,
+      "chord": "C"
+    },
+    {
+      "time": 124.354,
+      "chord": "D#"
+    },
+    {
+      "time": 125.475,
+      "chord": "G"
+    },
+    {
+      "time": 131.11,
+      "chord": "Bm"
+    },
+    {
+      "time": 136.42,
+      "chord": "C"
+    },
+    {
+      "time": 145.905,
+      "chord": "G"
+    },
+    {
+      "time": 152.07,
+      "chord": "Bm"
+    },
+    {
+      "time": 157.141,
+      "chord": "C"
+    },
+    {
+      "time": 167.42,
+      "chord": "G"
+    },
+    {
+      "time": 172.56,
+      "chord": "Bm"
+    },
+    {
+      "time": 177.365,
+      "chord": "C"
+    },
+    {
+      "time": 188.18,
+      "chord": "G"
+    },
+    {
+      "time": 193.28,
+      "chord": "Bm"
+    },
+    {
+      "time": 198.43,
+      "chord": "C"
+    },
+    {
+      "time": 208.585,
+      "chord": "G"
+    },
+    {
+      "time": 213.93,
+      "chord": "Bm"
+    },
+    {
+      "time": 219.18,
+      "chord": "C"
+    },
+    {
+      "time": 227.985,
+      "chord": "G"
+    }
+  ],
+  "source": "ai",
+  "version": 3
+}

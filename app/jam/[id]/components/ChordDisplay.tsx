@@ -173,7 +173,7 @@ export default function ChordDisplay({
 
             <div className="-mt-14 flex flex-col">
                 {/* Main chord display: current chord + upcoming chord */}
-                <div className="pointer-events-none mb-6 mt-[-72px] flex items-start justify-center gap-10 px-4">
+                <div data-tour="chords" className="pointer-events-none mb-6 mt-[-72px] flex items-start justify-center gap-10 px-4">
                     <div className="max-w-[70vw] truncate text-[clamp(7.5rem,15vw,248px)] font-bold leading-none drop-shadow-[0_10px_24px_rgba(0,0,0,0.25)]" style={{ color: textColor }}>
                         {currentChord || "—"}
                     </div>

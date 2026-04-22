@@ -82,26 +82,26 @@ export default function SongsPage() {
           transition: background 0.12s, border-color 0.12s;
         }
         .song-card:hover {
-          background: rgba(196,94,50,0.06) !important;
+          background: rgba(120,60,200,0.06) !important;
           border-bottom-color: rgba(220,160,100,0.4) !important;
         }
         .settings-btn {
           transition: background 0.15s;
         }
         .settings-btn:hover {
-          background: rgba(196,94,50,0.22) !important;
+          background: rgba(120,60,200,0.22) !important;
         }
       `}</style>
 
       <div
         className="relative min-h-screen px-8 py-8 text-white"
-        style={{ fontFamily: "'Lora', serif", background: "#0f0c08" }}
+        style={{ fontFamily: "'Lora', serif", background: "#0a080f" }}
       >
 
         {/* ── Atmospheric background ── */}
         <div className="pointer-events-none fixed inset-0 overflow-hidden">
-          <div className="orb-1 absolute rounded-full" style={{ width: 1000, height: 1000, top: -400, left: -350, background: "radial-gradient(circle, rgba(196,94,50,0.28) 0%, rgba(160,60,20,0.10) 45%, transparent 70%)", filter: "blur(90px)" }} />
-          <div className="orb-2 absolute rounded-full" style={{ width: 700, height: 700, bottom: -200, right: -180, background: "radial-gradient(circle, rgba(184,120,40,0.18) 0%, transparent 65%)", filter: "blur(80px)" }} />
+          <div className="orb-1 absolute rounded-full" style={{ width: 1000, height: 1000, top: -400, left: -350, background: "radial-gradient(circle, rgba(120,60,200,0.28) 0%, rgba(90,30,160,0.10) 45%, transparent 70%)", filter: "blur(90px)" }} />
+          <div className="orb-2 absolute rounded-full" style={{ width: 700, height: 700, bottom: -200, right: -180, background: "radial-gradient(circle, rgba(100,50,180,0.18) 0%, transparent 65%)", filter: "blur(80px)" }} />
           <div className="absolute inset-0" style={{ background: "radial-gradient(ellipse at 30% 40%, transparent 30%, rgba(8,5,2,0.5) 75%, rgba(5,3,1,0.82) 100%)" }} />
           <div className="absolute inset-0" style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")`, backgroundSize: "256px 256px", opacity: 0.18, mixBlendMode: "overlay" }} />
         </div>
@@ -118,9 +118,9 @@ export default function SongsPage() {
             <Link
               href="/"
               className="text-sm mb-1"
-              style={{ color: "rgba(220,180,140,0.45)", transition: "color 0.15s" }}
+              style={{ color: "rgba(190,160,230,0.45)", transition: "color 0.15s" }}
               onMouseEnter={e => (e.currentTarget.style.color = "#C45A2A")}
-              onMouseLeave={e => (e.currentTarget.style.color = "rgba(220,180,140,0.45)")}
+              onMouseLeave={e => (e.currentTarget.style.color = "rgba(190,160,230,0.45)")}
             >
               ← Back
             </Link>
@@ -146,7 +146,7 @@ export default function SongsPage() {
                     <div
                       className="song-card relative flex items-center gap-4 px-2 py-4 cursor-pointer"
                       style={{
-                        borderBottom: "1px solid rgba(196,94,50,0.12)",
+                        borderBottom: "1px solid rgba(120,60,200,0.12)",
                       }}
                     >
                       {/* Settings button */}
@@ -159,9 +159,9 @@ export default function SongsPage() {
                         }}
                         className="settings-btn flex h-9 w-9 shrink-0 items-center justify-center rounded-md"
                         style={{
-                          background: "rgba(196,94,50,0.15)",
+                          background: "rgba(120,60,200,0.15)",
                           color: "#f0e4d0",
-                          boxShadow: "0 0 0 1px rgba(196,94,50,0.3)",
+                          boxShadow: "0 0 0 1px rgba(120,60,200,0.3)",
                         }}
                         aria-label={`Open settings for ${song.name}`}
                       >
@@ -179,7 +179,7 @@ export default function SongsPage() {
                         >
                           {song.name}
                         </div>
-                        <div className="mt-1 text-xs" style={{ color: isPending ? "rgba(220,180,140,0.25)" : "rgba(220,180,140,0.55)" }}>
+                        <div className="mt-1 text-xs" style={{ color: isPending ? "rgba(190,160,230,0.25)" : "rgba(190,160,230,0.55)" }}>
                           {isPending ? "Analyzing…" : `${song.key} · ${formatTrackBpm(song.bpm)} BPM`}
                         </div>
                       </div>
@@ -195,12 +195,12 @@ export default function SongsPage() {
                       className="absolute left-0 top-full z-50 mt-2 w-[180px] rounded-xl p-2"
                       style={{
                         background: "rgba(12,7,3,0.97)",
-                        border: "1px solid rgba(196,94,50,0.28)",
+                        border: "1px solid rgba(120,60,200,0.28)",
                         boxShadow: "0 20px 50px rgba(0,0,0,0.7)",
                         backdropFilter: "blur(16px)",
                       }}
                     >
-                      <div className="mb-2 px-2 text-xs" style={{ color: "rgba(220,180,140,0.45)", fontFamily: "'Lora', serif", letterSpacing: "0.08em" }}>Song Settings</div>
+                      <div className="mb-2 px-2 text-xs" style={{ color: "rgba(190,160,230,0.45)", fontFamily: "'Lora', serif", letterSpacing: "0.08em" }}>Song Settings</div>
                       {[
                         { label: "Rename Song", onClick: handleRenameSong },
                         { label: "Adjust BPM",  onClick: handleAdjustBpm  },
@@ -212,7 +212,7 @@ export default function SongsPage() {
                           onClick={onClick}
                           className="w-full rounded px-2 py-2 text-left text-sm"
                           style={{ color: "#f5ede0", fontFamily: "'Lora', serif", background: "none", border: "none", cursor: "pointer", transition: "background 0.1s" }}
-                          onMouseEnter={e => { e.currentTarget.style.background = "rgba(196,94,50,0.14)"; }}
+                          onMouseEnter={e => { e.currentTarget.style.background = "rgba(120,60,200,0.14)"; }}
                           onMouseLeave={e => { e.currentTarget.style.background = "none"; }}
                         >
                           {label}
@@ -235,7 +235,7 @@ export default function SongsPage() {
             })}
 
             {songs.length === 0 && (
-              <p className="py-10 text-center text-sm" style={{ color: "rgba(220,180,140,0.3)", fontStyle: "italic" }}>
+              <p className="py-10 text-center text-sm" style={{ color: "rgba(190,160,230,0.3)", fontStyle: "italic" }}>
                 No tracks yet. Upload one from the home screen.
               </p>
             )}

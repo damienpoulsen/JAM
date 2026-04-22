@@ -1,0 +1,430 @@
+{
+  "songId": "demo-mr-brightside",
+  "bpm": 146.3,
+  "beatStartTime": 0.12,
+  "detectedKey": "C#",
+  "chordEvents": [
+    {
+      "time": 0.725,
+      "chord": "C#"
+    },
+    {
+      "time": 10.112,
+      "chord": "F#"
+    },
+    {
+      "time": 12.817,
+      "chord": "C#"
+    },
+    {
+      "time": 14.885,
+      "chord": "C"
+    },
+    {
+      "time": 15.89,
+      "chord": "F#"
+    },
+    {
+      "time": 19.54,
+      "chord": "C#"
+    },
+    {
+      "time": 21.365,
+      "chord": "C"
+    },
+    {
+      "time": 22.7,
+      "chord": "F#"
+    },
+    {
+      "time": 26.04,
+      "chord": "C#"
+    },
+    {
+      "time": 27.65,
+      "chord": "C"
+    },
+    {
+      "time": 29.065,
+      "chord": "F#"
+    },
+    {
+      "time": 32.53,
+      "chord": "A#m"
+    },
+    {
+      "time": 34.876,
+      "chord": "D#m"
+    },
+    {
+      "time": 35.75,
+      "chord": "G#"
+    },
+    {
+      "time": 39.0,
+      "chord": "F#"
+    },
+    {
+      "time": 45.285,
+      "chord": "A#m"
+    },
+    {
+      "time": 47.735,
+      "chord": "D#m"
+    },
+    {
+      "time": 48.75,
+      "chord": "G#"
+    },
+    {
+      "time": 51.385,
+      "chord": "C#"
+    },
+    {
+      "time": 52.071,
+      "chord": "F#"
+    },
+    {
+      "time": 58.48,
+      "chord": "C#"
+    },
+    {
+      "time": 60.1,
+      "chord": "F#"
+    },
+    {
+      "time": 61.925,
+      "chord": "A#m"
+    },
+    {
+      "time": 63.35,
+      "chord": "G#"
+    },
+    {
+      "time": 64.97,
+      "chord": "C#"
+    },
+    {
+      "time": 66.795,
+      "chord": "F#"
+    },
+    {
+      "time": 68.415,
+      "chord": "A#m"
+    },
+    {
+      "time": 69.83,
+      "chord": "G#"
+    },
+    {
+      "time": 71.45,
+      "chord": "C#"
+    },
+    {
+      "time": 73.07,
+      "chord": "F#"
+    },
+    {
+      "time": 74.905,
+      "chord": "A#m"
+    },
+    {
+      "time": 76.33,
+      "chord": "G#"
+    },
+    {
+      "time": 77.92,
+      "chord": "C#"
+    },
+    {
+      "time": 79.56,
+      "chord": "F#"
+    },
+    {
+      "time": 81.395,
+      "chord": "A#m"
+    },
+    {
+      "time": 82.79,
+      "chord": "G#"
+    },
+    {
+      "time": 84.43,
+      "chord": "C#"
+    },
+    {
+      "time": 86.245,
+      "chord": "F#"
+    },
+    {
+      "time": 88.08,
+      "chord": "A#m"
+    },
+    {
+      "time": 89.3,
+      "chord": "G#"
+    },
+    {
+      "time": 90.91,
+      "chord": "C#"
+    },
+    {
+      "time": 92.868,
+      "chord": "F#"
+    },
+    {
+      "time": 94.482,
+      "chord": "A#m"
+    },
+    {
+      "time": 95.887,
+      "chord": "G#"
+    },
+    {
+      "time": 97.4,
+      "chord": "C#"
+    },
+    {
+      "time": 100.554,
+      "chord": "F#"
+    },
+    {
+      "time": 103.89,
+      "chord": "C#"
+    },
+    {
+      "time": 105.725,
+      "chord": "C"
+    },
+    {
+      "time": 106.935,
+      "chord": "F#"
+    },
+    {
+      "time": 108.24,
+      "chord": "C#"
+    },
+    {
+      "time": 108.955,
+      "chord": "F#"
+    },
+    {
+      "time": 110.38,
+      "chord": "C#"
+    },
+    {
+      "time": 112.205,
+      "chord": "C"
+    },
+    {
+      "time": 113.425,
+      "chord": "F#"
+    },
+    {
+      "time": 116.994,
+      "chord": "C#"
+    },
+    {
+      "time": 118.705,
+      "chord": "C"
+    },
+    {
+      "time": 120.11,
+      "chord": "F#"
+    },
+    {
+      "time": 123.575,
+      "chord": "A#m"
+    },
+    {
+      "time": 125.7,
+      "chord": "D#m"
+    },
+    {
+      "time": 126.61,
+      "chord": "G#"
+    },
+    {
+      "time": 129.83,
+      "chord": "F#"
+    },
+    {
+      "time": 136.135,
+      "chord": "A#m"
+    },
+    {
+      "time": 138.67,
+      "chord": "D#m"
+    },
+    {
+      "time": 139.59,
+      "chord": "G#"
+    },
+    {
+      "time": 142.42,
+      "chord": "C#"
+    },
+    {
+      "time": 143.035,
+      "chord": "F#"
+    },
+    {
+      "time": 149.33,
+      "chord": "C#"
+    },
+    {
+      "time": 150.93,
+      "chord": "F#"
+    },
+    {
+      "time": 152.755,
+      "chord": "A#m"
+    },
+    {
+      "time": 154.17,
+      "chord": "G#"
+    },
+    {
+      "time": 155.79,
+      "chord": "C#"
+    },
+    {
+      "time": 157.41,
+      "chord": "F#"
+    },
+    {
+      "time": 159.255,
+      "chord": "A#m"
+    },
+    {
+      "time": 160.66,
+      "chord": "G#"
+    },
+    {
+      "time": 162.28,
+      "chord": "C#"
+    },
+    {
+      "time": 163.9,
+      "chord": "F#"
+    },
+    {
+      "time": 165.53,
+      "chord": "A#m"
+    },
+    {
+      "time": 167.16,
+      "chord": "G#"
+    },
+    {
+      "time": 168.75,
+      "chord": "C#"
+    },
+    {
+      "time": 170.41,
+      "chord": "F#"
+    },
+    {
+      "time": 172.215,
+      "chord": "A#m"
+    },
+    {
+      "time": 173.445,
+      "chord": "G#"
+    },
+    {
+      "time": 175.27,
+      "chord": "C#"
+    },
+    {
+      "time": 176.89,
+      "chord": "F#"
+    },
+    {
+      "time": 180.12,
+      "chord": "G#"
+    },
+    {
+      "time": 181.74,
+      "chord": "C#"
+    },
+    {
+      "time": 183.575,
+      "chord": "F#"
+    },
+    {
+      "time": 185.4,
+      "chord": "A#m"
+    },
+    {
+      "time": 186.815,
+      "chord": "G#"
+    },
+    {
+      "time": 188.25,
+      "chord": "C#"
+    },
+    {
+      "time": 190.28,
+      "chord": "F#"
+    },
+    {
+      "time": 191.695,
+      "chord": "A#m"
+    },
+    {
+      "time": 193.1,
+      "chord": "G#"
+    },
+    {
+      "time": 194.72,
+      "chord": "C#"
+    },
+    {
+      "time": 196.565,
+      "chord": "F#"
+    },
+    {
+      "time": 198.38,
+      "chord": "A#m"
+    },
+    {
+      "time": 199.59,
+      "chord": "G#"
+    },
+    {
+      "time": 201.21,
+      "chord": "C#"
+    },
+    {
+      "time": 202.85,
+      "chord": "F#"
+    },
+    {
+      "time": 204.591,
+      "chord": "A#m"
+    },
+    {
+      "time": 206.1,
+      "chord": "G#"
+    },
+    {
+      "time": 207.71,
+      "chord": "C#"
+    },
+    {
+      "time": 209.49,
+      "chord": "F#"
+    },
+    {
+      "time": 211.155,
+      "chord": "A#m"
+    },
+    {
+      "time": 212.497,
+      "chord": "G#"
+    }
+  ],
+  "source": "ai",
+  "version": 3
+}

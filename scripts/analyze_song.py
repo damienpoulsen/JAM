@@ -15,6 +15,7 @@ import argparse
 import gc
 import json
 import os
+import sys
 import tempfile
 from pathlib import Path
 from typing import Any
@@ -49,6 +50,17 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Skip BPM/beat analysis for fast pipeline testing.",
     )
+    parser.add_argument(
+        "--extract-stems",
+        action="store_true",
+        help="Extract instrumental (no vocals) and save to --output path. Skips analysis.",
+    )
+    parser.add_argument(
+        "--stem-mode",
+        choices=["none", "hpss", "demucs"],
+        default="demucs",
+        help="Stem separation mode before chord detection. 'demucs' removes drums+vocals (best quality), 'hpss' removes drum transients (fast), 'none' uses full mix.",
+    )
     return parser.parse_args()
 
 
@@ -70,8 +82,8 @@ def normalize_lv_chord_label(label: str) -> str:
     return normalized or root
 
 
-MIN_CHORD_SEGMENT_SECONDS = 0.7
-BRIDGE_CHORD_MAX_SECONDS = 0.35
+MIN_CHORD_SEGMENT_SECONDS = 0.35
+BRIDGE_CHORD_MAX_SECONDS = 0.15
 BPM_VALID_MIN = 55.0
 BPM_VALID_MAX = 220.0
 BPM_PREFERRED_MIN = 84.0
@@ -527,34 +539,441 @@ def filter_chords_by_key(
     return final
 
 
+def _load_audio_tensor(audio_path: Path, target_sr: int):
+    """Load audio file to a (2, samples) float32 torch tensor at target_sr."""
+    import torch
+    import soundfile as sf
+    import numpy as np
+    data, sr = sf.read(str(audio_path), dtype="float32", always_2d=True)
+    wav = torch.from_numpy(data.T)  # (channels, samples)
+    if wav.shape[0] == 1:
+        wav = wav.repeat(2, 1)
+    if sr != target_sr:
+        try:
+            import torchaudio
+            wav = torchaudio.functional.resample(wav, sr, target_sr)
+        except Exception:
+            import librosa
+            mono = librosa.resample(data[:, 0], orig_sr=sr, target_sr=target_sr)
+            wav = torch.from_numpy(np.stack([mono, mono]))
+    return wav
+
+
+def _save_audio_tensor(tensor, sr: int, output_path: Path) -> None:
+    """Save a (channels, samples) float32 tensor as WAV."""
+    import soundfile as sf
+    import numpy as np
+    out = tensor.numpy().T  # (samples, channels)
+    sf.write(str(output_path), out, sr)
+
+
+def extract_instrumental(audio_path: Path, output_path: Path) -> None:
+    """
+    Use Demucs to separate stems, then mix everything except vocals into output_path.
+    Raises on failure.
+    """
+    import torch
+    from demucs.pretrained import get_model
+    from demucs.apply import apply_model
+
+    model = get_model("htdemucs")
+    model.eval()
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    model.to(device)
+
+    wav = _load_audio_tensor(audio_path, model.samplerate)
+    mix = wav.unsqueeze(0).to(device)
+    with torch.no_grad():
+        sources = apply_model(model, mix, device=device)[0]
+
+    stem_names = list(model.sources)
+    vocal_idx = stem_names.index("vocals")
+    instrumental = sum(
+        sources[i].cpu()
+        for i in range(len(stem_names))
+        if i != vocal_idx
+    )
+
+    _save_audio_tensor(instrumental, model.samplerate, output_path)
+
+
+def separate_for_chords(audio_path: Path, mode: str) -> "Path | None":
+    """
+    Isolate harmonic content from audio before chord detection.
+    Returns path to a temp WAV file, or None to use the original.
+    Caller is responsible for deleting the returned file.
+    """
+    if mode == "demucs":
+        try:
+            import torch
+            from demucs.pretrained import get_model
+            from demucs.apply import apply_model
+
+            model = get_model("htdemucs")
+            model.eval()
+            device = "cuda" if torch.cuda.is_available() else "cpu"
+            model.to(device)
+
+            wav = _load_audio_tensor(audio_path, model.samplerate)
+            mix = wav.unsqueeze(0).to(device)
+            with torch.no_grad():
+                sources = apply_model(model, mix, device=device)[0]
+
+            stem_names = list(model.sources)
+            bass_idx  = stem_names.index("bass")
+            other_idx = stem_names.index("other")
+            harmonic = (sources[bass_idx] + sources[other_idx]).cpu()
+
+            tmp = Path(tempfile.mktemp(suffix=".wav"))
+            _save_audio_tensor(harmonic, model.samplerate, tmp)
+            print("[stem-sep] demucs: bass+other extracted successfully", file=sys.stderr)
+            return tmp
+        except Exception as exc:
+            print(f"[stem-sep] demucs failed ({exc}), falling back to HPSS", file=sys.stderr)
+
+    if mode in ("hpss", "demucs"):
+        try:
+            import soundfile as sf
+            signal, sr = librosa.load(audio_path, sr=22050, mono=True)
+            y_harmonic, _ = librosa.effects.hpss(signal)
+            tmp = Path(tempfile.mktemp(suffix=".wav"))
+            sf.write(str(tmp), y_harmonic, sr)
+            label = "hpss" if mode == "hpss" else "hpss (demucs fallback)"
+            print(f"[stem-sep] {label}: harmonic component extracted", file=sys.stderr)
+            return tmp
+        except Exception as exc:
+            print(f"[stem-sep] HPSS failed ({exc}), using original mix", file=sys.stderr)
+            return None
+
+    print("[stem-sep] none: using original mix", file=sys.stderr)
+    return None  # mode == "none"
+
+
+def _patch_collections_compat() -> None:
+    """Monkey-patch collections.abc aliases removed in Python 3.10+.
+
+    madmom 0.16.x uses bare `collections.MutableSequence` etc., which no
+    longer exist in Python 3.10+. Patching once before import is safe.
+    """
+    import collections
+    import collections.abc
+    for _name in dir(collections.abc):
+        if not hasattr(collections, _name):
+            setattr(collections, _name, getattr(collections.abc, _name))
+
+
+def _detect_chords_madmom(audio_path: Path) -> list[dict[str, Any]]:
+    """Chord recognition via madmom DeepChroma model (CNN + CRF decoder).
+
+    Returns raw segments in the same shape as lv_chordia so the rest of
+    the pipeline (smoothing, key detection) is unchanged.
+    """
+    _patch_collections_compat()
+    from madmom.features.chords import CNNChordFeatureProcessor, CRFChordRecognitionProcessor
+
+    wav_path, is_tmp = _to_wav_for_madmom(audio_path)
+    try:
+        features = CNNChordFeatureProcessor()(str(wav_path))
+        chords = CRFChordRecognitionProcessor()(features)
+    finally:
+        if is_tmp and wav_path.exists():
+            wav_path.unlink()
+
+    return [
+        {"start_time": float(c[0]), "end_time": float(c[1]), "chord": str(c[2])}
+        for c in chords
+    ]
+
+
+def _detect_chords_lvchordia(audio_path: Path) -> list[dict[str, Any]]:
+    from lv_chordia.chord_recognition import chord_recognition
+    return chord_recognition(str(audio_path), chord_dict_name="submission")  # type: ignore[return-value]
+
+
+def _chord_root(label: str) -> str:
+    """Extract just the root note from a chord label (e.g. 'Am7' → 'A', 'F#m' → 'F#')."""
+    if not label or label == "N":
+        return "N"
+    if len(label) >= 2 and label[1] in ("#", "b"):
+        return label[:2]
+    return label[:1]
+
+
+def _ensemble_merge_chords(
+    madmom_segs: list[dict[str, Any]],
+    lv_segs: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Merge two chord detection results into one higher-confidence sequence.
+
+    For each madmom segment we find the lv_chordia segment with the greatest
+    temporal overlap and compare roots:
+      - Roots agree  → keep madmom chord as-is (high confidence)
+      - Roots disagree → keep madmom chord but flag it so smoothing is stricter
+        (short disagreement bursts get absorbed into neighbours)
+
+    The merged output is normal segment dicts, but disagreement segments carry
+    an extra "_uncertain" key that smooth_chord_segments_ensemble uses to apply
+    a tighter minimum-duration threshold.
+    """
+    if not lv_segs:
+        return madmom_segs
+
+    # Pre-normalise lv_chordia labels so roots are comparable
+    lv_normalised = [
+        {**s, "chord": normalize_lv_chord_label(s["chord"])}
+        for s in lv_segs
+    ]
+
+    merged: list[dict[str, Any]] = []
+    for seg in madmom_segs:
+        mid = (float(seg["start_time"]) + float(seg["end_time"])) / 2.0
+
+        # Find lv_chordia segment that contains midpoint (or is closest)
+        lv_chord: str | None = None
+        for lv in lv_normalised:
+            if float(lv["start_time"]) <= mid < float(lv["end_time"]):
+                lv_chord = lv["chord"]
+                break
+        if lv_chord is None and lv_normalised:
+            # Closest by midpoint distance
+            lv_chord = min(
+                lv_normalised,
+                key=lambda s: abs((float(s["start_time"]) + float(s["end_time"])) / 2.0 - mid),
+            )["chord"]
+
+        madmom_root = _chord_root(normalize_lv_chord_label(seg["chord"]))
+        lv_root = _chord_root(lv_chord or "N")
+        uncertain = madmom_root != lv_root and madmom_root != "N" and lv_root != "N"
+
+        merged.append({**seg, "_uncertain": uncertain})
+
+    return merged
+
+
+def _smooth_ensemble_segments(raw_segments: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Like smooth_chord_segments but uses stricter min-duration for uncertain segments."""
+    CERTAIN_MIN = MIN_CHORD_SEGMENT_SECONDS       # 0.35 s
+    UNCERTAIN_MIN = MIN_CHORD_SEGMENT_SECONDS * 1.4  # ~0.49 s — slightly stricter for disagreements
+
+    cleaned = []
+    for item in raw_segments:
+        if not isinstance(item, dict):
+            continue
+        start_time = item.get("start_time")
+        end_time = item.get("end_time")
+        raw_label = item.get("chord")
+        if not isinstance(start_time, (int, float)) or not isinstance(end_time, (int, float)):
+            continue
+        if not isinstance(raw_label, str):
+            continue
+        chord_label = normalize_lv_chord_label(raw_label)
+        if chord_label == "N":
+            continue
+        start = round(float(start_time), 3)
+        end = round(float(end_time), 3)
+        if end <= start:
+            continue
+        cleaned.append({"start_time": start, "end_time": end, "chord": chord_label, "_uncertain": item.get("_uncertain", False)})
+
+    if not cleaned:
+        return []
+
+    # Collapse consecutive identical chords
+    collapsed: list[dict[str, Any]] = []
+    for seg in cleaned:
+        prev = collapsed[-1] if collapsed else None
+        if prev and prev["chord"] == seg["chord"]:
+            prev["end_time"] = max(prev["end_time"], seg["end_time"])
+            prev["_uncertain"] = prev["_uncertain"] and seg["_uncertain"]
+            continue
+        collapsed.append(seg.copy())
+
+    # Bridge smoothing (same as original)
+    bridge_smoothed: list[dict[str, Any]] = []
+    for idx, seg in enumerate(collapsed):
+        prev = bridge_smoothed[-1] if bridge_smoothed else None
+        nxt = collapsed[idx + 1] if idx + 1 < len(collapsed) else None
+        dur = seg["end_time"] - seg["start_time"]
+        if (
+            prev and nxt
+            and dur <= BRIDGE_CHORD_MAX_SECONDS
+            and prev["chord"] == nxt["chord"]
+        ):
+            prev["end_time"] = nxt["end_time"]
+            continue
+        bridge_smoothed.append(seg.copy())
+
+    # Duration filtering — stricter threshold for uncertain chords
+    dur_filtered: list[dict[str, Any]] = []
+    for idx, seg in enumerate(bridge_smoothed):
+        min_dur = UNCERTAIN_MIN if seg.get("_uncertain") else CERTAIN_MIN
+        dur = seg["end_time"] - seg["start_time"]
+        if dur >= min_dur:
+            dur_filtered.append(seg.copy())
+            continue
+        prev = dur_filtered[-1] if dur_filtered else None
+        nxt = bridge_smoothed[idx + 1] if idx + 1 < len(bridge_smoothed) else None
+        if prev and nxt:
+            if seg["start_time"] - prev["end_time"] <= nxt["start_time"] - seg["end_time"]:
+                prev["end_time"] = seg["end_time"]
+            else:
+                nxt["start_time"] = seg["start_time"]
+            continue
+        if prev:
+            prev["end_time"] = seg["end_time"]
+            continue
+        if nxt:
+            nxt["start_time"] = seg["start_time"]
+            continue
+        dur_filtered.append(seg.copy())
+
+    # Final collapse + strip internal key
+    final: list[dict[str, Any]] = []
+    for seg in dur_filtered:
+        prev = final[-1] if final else None
+        if prev and prev["chord"] == seg["chord"]:
+            prev["end_time"] = max(prev["end_time"], seg["end_time"])
+            continue
+        final.append({"start_time": seg["start_time"], "end_time": seg["end_time"], "chord": seg["chord"]})
+
+    return final
+
+
+def _refine_chord_starts_with_onsets(
+    segments: list[dict[str, Any]],
+    audio_path: Path,
+    search_window: float = 0.18,
+) -> list[dict[str, Any]]:
+    """Pull chord start times back to the nearest harmonic onset.
+
+    The CNN/CRF detectors place chord changes at the frame centre after
+    processing, which is typically 80-180ms late. Onset detection on the
+    separated harmonic stem finds the exact moment new harmonic content
+    begins, which is where the chord actually starts in the audio.
+
+    search_window: max seconds *before* the detected start to look for an
+    onset. We never move a chord start *later* than the detected time.
+    """
+    if not segments:
+        return segments
+
+    try:
+        signal, sr = librosa.load(audio_path, sr=22050, mono=True)
+        # Harmonic component isolates pitched onsets from any remaining transients
+        harmonic = librosa.effects.harmonic(signal, margin=3)
+        onset_frames = librosa.onset.onset_detect(
+            y=harmonic,
+            sr=sr,
+            hop_length=256,
+            backtrack=True,          # backtrack to the energy trough before the onset peak
+            units="frames",
+        )
+        onset_times = librosa.frames_to_time(onset_frames, sr=sr, hop_length=256)
+        del signal, harmonic
+    except Exception as exc:
+        print(f"[onset] onset detection failed ({exc}), skipping refinement", file=sys.stderr)
+        return segments
+
+    if onset_times.size == 0:
+        return segments
+
+    refined: list[dict[str, Any]] = []
+    for seg in segments:
+        detected_start = float(seg["start_time"])
+        # Find onsets in (detected_start - search_window, detected_start + 0.04)
+        # The small positive tolerance handles tiny over-corrections in the detector
+        lo = detected_start - search_window
+        hi = detected_start + 0.04
+        candidates = onset_times[(onset_times >= lo) & (onset_times <= hi)]
+
+        if candidates.size > 0:
+            # Use the latest onset before/at the detected start (closest to real change)
+            best = float(candidates[candidates <= detected_start + 0.04].max()
+                         if (candidates <= detected_start + 0.04).any()
+                         else candidates[0])
+            new_start = round(min(best, detected_start), 3)
+        else:
+            new_start = round(detected_start, 3)
+
+        refined.append({**seg, "start_time": new_start})
+
+    # Fix any end_times that now precede the next start
+    for i in range(len(refined) - 1):
+        if refined[i]["end_time"] > refined[i + 1]["start_time"]:
+            refined[i]["end_time"] = refined[i + 1]["start_time"]
+
+    onset_count = sum(1 for o, s in zip(refined, segments) if o["start_time"] < s["start_time"])
+    print(f"[onset] refined {onset_count}/{len(segments)} chord starts earlier", file=sys.stderr)
+    return refined
+
+
 def detect_chord_events(
     audio_path: Path,
     detect_chords: bool,
+    stem_mode: str = "demucs",
 ) -> tuple[list[dict[str, Any]], str | None]:
     if not detect_chords:
         return ([], None)
 
     os.environ.setdefault("MPLCONFIGDIR", str(Path(tempfile.gettempdir()) / "jam-mpl-cache"))
 
-    try:
-        from lv_chordia.chord_recognition import chord_recognition
-    except Exception:
-        return ([], None)
+    tmp_file = separate_for_chords(audio_path, stem_mode)
+    chord_source = tmp_file if tmp_file is not None else audio_path
+
+    madmom_segs: list[dict[str, Any]] | None = None
+    lv_segs: list[dict[str, Any]] | None = None
+    results: list[dict[str, Any]] | None = None
+    use_ensemble = False
 
     try:
-        results = chord_recognition(str(audio_path), chord_dict_name="submission")
-    except Exception:
+        madmom_segs = _detect_chords_madmom(chord_source)
+        print("[chords] madmom DeepChroma OK", file=sys.stderr)
+    except Exception as exc:
+        print(f"[chords] madmom failed ({exc})", file=sys.stderr)
+
+    try:
+        lv_segs = _detect_chords_lvchordia(chord_source)
+        print("[chords] lv_chordia OK", file=sys.stderr)
+    except Exception as exc:
+        print(f"[chords] lv_chordia failed ({exc})", file=sys.stderr)
+
+    # Keep tmp_file alive — onset refinement needs chord_source after this block
+
+    if madmom_segs and lv_segs:
+        print("[chords] ensemble: merging madmom + lv_chordia", file=sys.stderr)
+        results = _ensemble_merge_chords(madmom_segs, lv_segs)
+        use_ensemble = True
+    elif madmom_segs:
+        results = madmom_segs
+        print("[chords] using madmom only (lv_chordia unavailable)", file=sys.stderr)
+    elif lv_segs:
+        results = lv_segs
+        print("[chords] using lv_chordia only (madmom unavailable)", file=sys.stderr)
+    else:
+        print("[chords] both detectors failed", file=sys.stderr)
+
+    if not results:
         return ([], None)
 
-    smoothed_segments = smooth_chord_segments(results)
+    smoothed_segments = _smooth_ensemble_segments(results) if use_ensemble else smooth_chord_segments(results)
     del results
     gc.collect()
+
+    # Refine chord change timestamps using onset detection on the harmonic source.
+    # The CNN/CRF detectors have inherent frame-window lag — they see a blend of audio
+    # around each chord boundary and tend to place the change slightly late.
+    # Onset detection finds the exact moment where new harmonic content begins,
+    # giving us precise anchors to snap chord starts to.
+    smoothed_segments = _refine_chord_starts_with_onsets(smoothed_segments, chord_source)
+
+    # Now safe to delete the separated stem temp file
+    if tmp_file is not None and tmp_file.exists():
+        tmp_file.unlink()
 
     chord_key = infer_key_from_segments(smoothed_segments)
     chroma_key = detect_key_from_chromagram(audio_path)
     final_key = resolve_detected_key(chord_key, chroma_key)
 
-    # Correct obvious major/minor quality errors now that the key is known
     if final_key is not None:
         smoothed_segments = filter_chords_by_key(smoothed_segments, final_key)
 
@@ -688,7 +1107,108 @@ def infer_beat_start_time(
     return anchor_time - (best_phase * beat_duration)
 
 
-def analyze_bpm_and_beats(audio_path: Path) -> tuple[float | None, float | None]:
+def snap_chord_events_to_beats(
+    events: list[dict[str, Any]],
+    beat_times: np.ndarray,
+    bpm: float,
+    max_snap_ratio: float = 0.22,
+) -> list[dict[str, Any]]:
+    """Snap chord event timestamps to the nearest beat or half-beat position.
+
+    Most real chord changes land on beats or half-beats. Snapping eliminates
+    frame-window jitter from fixed-hop detectors.
+
+    max_snap_ratio: max snap distance as fraction of a beat (conservative —
+    prevents snapping a chord *later* than it was detected, which feels behind).
+    Snapping later than the detected time is capped at half the snap window.
+    """
+    if len(beat_times) < 2 or bpm <= 0 or not events:
+        return events
+
+    beat_interval = 60.0 / bpm
+    half_interval = beat_interval / 2.0
+    max_snap_seconds = beat_interval * max_snap_ratio
+    # Only allow snapping *later* by half the window — bias toward early display
+    max_snap_later = max_snap_seconds * 0.5
+
+    # Build a dense grid: every beat + every half-beat
+    half_beats = beat_times + half_interval
+    grid = np.sort(np.concatenate([beat_times, half_beats]))
+
+    snapped: list[dict[str, Any]] = []
+    for event in events:
+        t = float(event["time"])
+        diffs = grid - t  # positive = grid point is later than detected
+        abs_diffs = np.abs(diffs)
+        nearest_idx = int(np.argmin(abs_diffs))
+        distance = float(abs_diffs[nearest_idx])
+        is_later = float(diffs[nearest_idx]) > 0
+
+        # Don't snap if: too far, or snapping later than the looser cap
+        if distance <= max_snap_seconds and not (is_later and distance > max_snap_later):
+            snapped_time = round(float(grid[nearest_idx]), 3)
+        else:
+            snapped_time = round(t, 3)
+        snapped.append({**event, "time": snapped_time})
+
+    # Remove any events that collapsed to the same timestamp (keep the first)
+    result: list[dict[str, Any]] = []
+    for event in snapped:
+        if result and result[-1]["time"] >= event["time"]:
+            continue
+        result.append(event)
+
+    return result
+
+
+def _to_wav_for_madmom(audio_path: Path) -> tuple[Path, bool]:
+    """Return a mono 44100 Hz WAV that madmom can reliably read.
+
+    madmom's audio loader requires ffmpeg for non-WAV formats and can also
+    choke on stereo or non-standard-rate WAVs. We always write a fresh
+    mono 44100 Hz PCM WAV to avoid all of these edge cases.
+    """
+    import soundfile as sf
+    signal, _ = librosa.load(audio_path, sr=44100, mono=True)
+    tmp = Path(tempfile.mktemp(suffix=".wav"))
+    sf.write(str(tmp), signal, 44100, subtype="PCM_16")
+    return tmp, True
+
+
+def _detect_beats_madmom(audio_path: Path) -> tuple[float | None, float | None, np.ndarray]:
+    """Beat tracking via madmom DBN beat tracker (RNN activations + Viterbi decoding).
+
+    Significantly more accurate than librosa on syncopated rhythms and tracks
+    with weak percussion. Falls back to librosa if unavailable.
+    """
+    _patch_collections_compat()
+    from madmom.features.beats import RNNBeatProcessor, DBNBeatTrackingProcessor
+
+    wav_path, is_tmp = _to_wav_for_madmom(audio_path)
+    try:
+        act = RNNBeatProcessor()(str(wav_path))
+        beat_times: np.ndarray = DBNBeatTrackingProcessor(fps=100)(act)
+    finally:
+        if is_tmp and wav_path.exists():
+            wav_path.unlink()
+
+    if len(beat_times) < 2:
+        return None, None, np.array([])
+
+    intervals = np.diff(beat_times)
+    stable = intervals[(intervals > 0.2) & (intervals < 2.0)]
+    if stable.size == 0:
+        return None, None, beat_times
+
+    raw_bpm = round(60.0 / float(np.median(stable)), 1)
+    bpm = correct_bpm(raw_bpm)
+    beat_start_time = float(beat_times[0])
+
+    print(f"[beat] madmom DBN: bpm={bpm}", file=sys.stderr)
+    return bpm, beat_start_time, beat_times
+
+
+def _analyze_bpm_and_beats_librosa(audio_path: Path) -> tuple[float | None, float | None, np.ndarray]:
     signal, sample_rate = librosa.load(audio_path, sr=22050, mono=True)
     _, percussive = librosa.effects.hpss(signal)
 
@@ -774,9 +1294,23 @@ def analyze_bpm_and_beats(audio_path: Path) -> tuple[float | None, float | None]
     else:
         beat_start_time = infer_beat_start_time(beat_times, beat_frames, onset_envelope, bpm)
 
+    saved_beat_times = beat_times.copy()
     del percussive, onset_envelope, beat_frames, beat_times, autocorrelation
     gc.collect()
-    return bpm, beat_start_time
+    print(f"[beat] librosa fallback: bpm={bpm}", file=sys.stderr)
+    return bpm, beat_start_time, saved_beat_times
+
+
+def analyze_bpm_and_beats(audio_path: Path) -> tuple[float | None, float | None, np.ndarray]:
+    """Try madmom DBN first; fall back to librosa if madmom is unavailable."""
+    try:
+        result = _detect_beats_madmom(audio_path)
+        if result[0] is not None:
+            return result
+    except Exception as exc:
+        print(f"[beat] madmom failed ({exc}), falling back to librosa", file=sys.stderr)
+
+    return _analyze_bpm_and_beats_librosa(audio_path)
 
 
 def main() -> None:
@@ -785,14 +1319,26 @@ def main() -> None:
     if not audio_path.exists():
         raise FileNotFoundError(f"Audio file not found: {audio_path}")
 
+    if args.extract_stems:
+        if not args.output:
+            raise ValueError("--extract-stems requires --output <path>")
+        extract_instrumental(audio_path, Path(args.output))
+        print(json.dumps({"success": True}))
+        return
+
     if args.skip_bpm:
-        bpm, beat_start_time = None, None
+        bpm, beat_start_time, beat_times = None, None, np.array([])
     else:
-        bpm, beat_start_time = analyze_bpm_and_beats(audio_path)
+        bpm, beat_start_time, beat_times = analyze_bpm_and_beats(audio_path)
     chord_events, detected_key = detect_chord_events(
         audio_path=audio_path,
         detect_chords=args.detect_chords,
+        stem_mode=args.stem_mode,
     )
+
+    if chord_events and len(beat_times) >= 2 and bpm is not None:
+        chord_events = snap_chord_events_to_beats(chord_events, beat_times, bpm)
+        print(f"[beat-align] snapped {len(chord_events)} chord events to beat grid (bpm={bpm})", file=sys.stderr)
 
     analysis = {
         "songId": args.song_id,

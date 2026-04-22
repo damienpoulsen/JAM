@@ -1,0 +1,326 @@
+{
+  "songId": "demo-knockin-on-heavens-door",
+  "bpm": 69.8,
+  "beatStartTime": 0.15,
+  "detectedKey": "G",
+  "chordEvents": [
+    {
+      "time": 0.15,
+      "chord": "G"
+    },
+    {
+      "time": 1.86,
+      "chord": "D"
+    },
+    {
+      "time": 3.46,
+      "chord": "Am"
+    },
+    {
+      "time": 6.8,
+      "chord": "G"
+    },
+    {
+      "time": 8.68,
+      "chord": "D"
+    },
+    {
+      "time": 10.286,
+      "chord": "C"
+    },
+    {
+      "time": 13.44,
+      "chord": "G"
+    },
+    {
+      "time": 15.54,
+      "chord": "D"
+    },
+    {
+      "time": 17.24,
+      "chord": "Am"
+    },
+    {
+      "time": 20.445,
+      "chord": "G"
+    },
+    {
+      "time": 22.38,
+      "chord": "D"
+    },
+    {
+      "time": 24.12,
+      "chord": "C"
+    },
+    {
+      "time": 27.376,
+      "chord": "G"
+    },
+    {
+      "time": 29.27,
+      "chord": "D"
+    },
+    {
+      "time": 30.99,
+      "chord": "Am"
+    },
+    {
+      "time": 34.42,
+      "chord": "G"
+    },
+    {
+      "time": 36.13,
+      "chord": "D"
+    },
+    {
+      "time": 37.85,
+      "chord": "C"
+    },
+    {
+      "time": 41.27,
+      "chord": "G"
+    },
+    {
+      "time": 42.98,
+      "chord": "D"
+    },
+    {
+      "time": 44.7,
+      "chord": "Am"
+    },
+    {
+      "time": 47.996,
+      "chord": "G"
+    },
+    {
+      "time": 49.749,
+      "chord": "D"
+    },
+    {
+      "time": 51.55,
+      "chord": "C"
+    },
+    {
+      "time": 54.99,
+      "chord": "G"
+    },
+    {
+      "time": 56.7,
+      "chord": "D"
+    },
+    {
+      "time": 58.42,
+      "chord": "Am"
+    },
+    {
+      "time": 61.637,
+      "chord": "G"
+    },
+    {
+      "time": 63.55,
+      "chord": "D"
+    },
+    {
+      "time": 65.27,
+      "chord": "C"
+    },
+    {
+      "time": 68.6,
+      "chord": "G"
+    },
+    {
+      "time": 70.41,
+      "chord": "D"
+    },
+    {
+      "time": 71.947,
+      "chord": "Am"
+    },
+    {
+      "time": 75.418,
+      "chord": "G"
+    },
+    {
+      "time": 77.27,
+      "chord": "D"
+    },
+    {
+      "time": 78.82,
+      "chord": "C"
+    },
+    {
+      "time": 82.2,
+      "chord": "G"
+    },
+    {
+      "time": 84.12,
+      "chord": "D"
+    },
+    {
+      "time": 85.84,
+      "chord": "Am"
+    },
+    {
+      "time": 89.27,
+      "chord": "G"
+    },
+    {
+      "time": 90.99,
+      "chord": "D"
+    },
+    {
+      "time": 92.5,
+      "chord": "C"
+    },
+    {
+      "time": 96.12,
+      "chord": "G"
+    },
+    {
+      "time": 97.85,
+      "chord": "D"
+    },
+    {
+      "time": 99.54,
+      "chord": "Am"
+    },
+    {
+      "time": 102.99,
+      "chord": "G"
+    },
+    {
+      "time": 104.525,
+      "chord": "D"
+    },
+    {
+      "time": 106.2,
+      "chord": "C"
+    },
+    {
+      "time": 109.86,
+      "chord": "G"
+    },
+    {
+      "time": 111.56,
+      "chord": "D"
+    },
+    {
+      "time": 113.27,
+      "chord": "Am"
+    },
+    {
+      "time": 116.6,
+      "chord": "G"
+    },
+    {
+      "time": 118.41,
+      "chord": "D"
+    },
+    {
+      "time": 120.13,
+      "chord": "C"
+    },
+    {
+      "time": 123.437,
+      "chord": "G"
+    },
+    {
+      "time": 125.27,
+      "chord": "D"
+    },
+    {
+      "time": 126.99,
+      "chord": "Am"
+    },
+    {
+      "time": 130.42,
+      "chord": "G"
+    },
+    {
+      "time": 132.13,
+      "chord": "D"
+    },
+    {
+      "time": 133.7,
+      "chord": "C"
+    },
+    {
+      "time": 137.27,
+      "chord": "G"
+    },
+    {
+      "time": 138.99,
+      "chord": "D"
+    },
+    {
+      "time": 140.7,
+      "chord": "Am"
+    },
+    {
+      "time": 144.13,
+      "chord": "G"
+    },
+    {
+      "time": 145.84,
+      "chord": "D"
+    },
+    {
+      "time": 147.56,
+      "chord": "C"
+    },
+    {
+      "time": 150.99,
+      "chord": "G"
+    },
+    {
+      "time": 152.7,
+      "chord": "D"
+    },
+    {
+      "time": 154.42,
+      "chord": "Am"
+    },
+    {
+      "time": 157.85,
+      "chord": "G"
+    },
+    {
+      "time": 159.56,
+      "chord": "D"
+    },
+    {
+      "time": 161.112,
+      "chord": "C"
+    },
+    {
+      "time": 164.6,
+      "chord": "G"
+    },
+    {
+      "time": 166.41,
+      "chord": "D"
+    },
+    {
+      "time": 168.13,
+      "chord": "Am"
+    },
+    {
+      "time": 171.56,
+      "chord": "G"
+    },
+    {
+      "time": 173.27,
+      "chord": "D"
+    },
+    {
+      "time": 174.98,
+      "chord": "C"
+    },
+    {
+      "time": 178.42,
+      "chord": "G"
+    }
+  ],
+  "source": "ai",
+  "version": 3
+}

@@ -1,9 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useState, type ChangeEvent } from "react";
+import { useEffect, useRef, useState, type ChangeEvent } from "react";
+import { useRouter } from "next/navigation";
+import { useForm, ValidationError } from "@formspree/react";
 import { deleteFile, saveFile } from "../lib/db";
 import { readSongs, type Song, writeSongs } from "../lib/songs";
+import { saveSongAnalysis, type SongAnalysis } from "../lib/analysis";
 
 function formatTrackBpm(value: Song["bpm"]) {
   if (typeof value === "number") {
@@ -23,14 +26,67 @@ function formatTrackBpm(value: Song["bpm"]) {
   return "--";
 }
 
+const LET_HER_GO = { slug: "let-her-go", name: "Let Her Go", artist: "Passenger", key: "G", bpm: 76 };
+
 export default function Home() {
+  const router = useRouter();
   const [songs, setSongs] = useState<Song[]>(() => readSongs());
   const [openMenuIndex, setOpenMenuIndex] = useState<number | null>(null);
   const [menuPosition, setMenuPosition] = useState<{
     top: number;
     left: number;
   } | null>(null);
-  const [mobileNoticeOpen, setMobileNoticeOpen] = useState(true);
+  const [mobileNoticeOpen, setMobileNoticeOpen] = useState(false);
+  const [tourModalOpen, setTourModalOpen] = useState(false);
+  const [tourLoading, setTourLoading] = useState(false);
+  const tourFileRef = useRef<HTMLInputElement>(null);
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const [feedbackState, submitFeedback] = useForm("maqadgga");
+
+  useEffect(() => {
+    try {
+      const toured = localStorage.getItem("jam-toured");
+      if (!toured) setTourModalOpen(true);
+    } catch {}
+  }, []);
+
+  const handleStartTour = async () => {
+    setTourLoading(true);
+    try {
+      const existing = readSongs();
+      const found = existing.find((s) => s.name === LET_HER_GO.name);
+      if (found) {
+        router.push(`/jam/${found.id}?tour=true`);
+        return;
+      }
+      const id = crypto.randomUUID();
+      try {
+        const res = await fetch(`/demos/analysis/${LET_HER_GO.slug}.json`);
+        if (res.ok) {
+          const analysis = await res.json() as SongAnalysis;
+          saveSongAnalysis({ ...analysis, songId: id });
+        }
+      } catch {}
+      const song: Song = { id, fileId: id, name: LET_HER_GO.name, key: LET_HER_GO.key, bpm: LET_HER_GO.bpm, analysisStatus: "ready" };
+      writeSongs([song, ...existing]);
+      setSongs([song, ...existing]);
+      try {
+        const res = await fetch(`/demos/${LET_HER_GO.slug}.mp3`);
+        if (res.ok) {
+          const blob = await res.blob();
+          await saveFile(id, new File([blob], `${LET_HER_GO.name}.mp3`, { type: "audio/mpeg" }));
+        }
+      } catch {}
+      router.push(`/jam/${id}?tour=true`);
+    } catch {
+      setTourLoading(false);
+    }
+  };
+
+  const handleSkipTour = () => {
+    try { localStorage.setItem("jam-toured", "true"); } catch {}
+    setTourModalOpen(false);
+  };
 
   const handleUpload = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -125,6 +181,71 @@ export default function Home() {
 
   return (
     <>
+      {/* Tour welcome modal — shown to new users */}
+      {tourModalOpen && (
+        <div
+          className="fixed inset-0 z-[55] flex items-end justify-center pb-8 px-4 sm:items-center sm:pb-0"
+          style={{ background: "rgba(0,0,0,0.72)", backdropFilter: "blur(6px)" }}
+        >
+          <div
+            className="w-full max-w-sm rounded-2xl border px-6 py-7 shadow-[0_24px_60px_rgba(0,0,0,0.7)]"
+            style={{
+              background: "rgba(10,8,15,0.97)",
+              borderColor: "rgba(255,255,255,0.12)",
+              fontFamily: "'Lora', serif",
+            }}
+          >
+            <div
+              className="mb-1 text-[10px] font-bold uppercase tracking-[0.22em]"
+              style={{ fontFamily: "'Courier Prime', monospace", color: "rgba(190,160,230,0.5)" }}
+            >
+              30 seconds
+            </div>
+            <h2
+              className="mb-3 text-[22px] font-semibold leading-snug text-white"
+            >
+              See how JAM works
+            </h2>
+            <p
+              className="mb-7 text-[14px] leading-relaxed"
+              style={{ fontStyle: "italic", color: "rgba(190,160,230,0.72)" }}
+            >
+              JAM reads the chords in any song and shows you the theory on a live fretboard. Want a quick look?
+            </p>
+            <div className="flex flex-col gap-3">
+              <button
+                type="button"
+                onClick={handleStartTour}
+                disabled={tourLoading}
+                className="w-full rounded-xl py-3 text-[13px] font-bold uppercase tracking-[0.12em] text-white transition"
+                style={{
+                  fontFamily: "'Courier Prime', monospace",
+                  border: "1.5px solid rgba(255,255,255,0.75)",
+                  background: tourLoading ? "rgba(255,255,255,0.04)" : "rgba(255,255,255,0.06)",
+                  boxShadow: "0 0 18px rgba(255,255,255,0.12)",
+                }}
+              >
+                {tourLoading ? "Loading…" : "Show me →"}
+              </button>
+              <button
+                type="button"
+                onClick={handleSkipTour}
+                className="w-full py-2 text-[11px] uppercase tracking-[0.14em] transition"
+                style={{
+                  fontFamily: "'Courier Prime', monospace",
+                  color: "rgba(190,160,230,0.38)",
+                  background: "none",
+                  border: "none",
+                  cursor: "pointer",
+                }}
+              >
+                I&apos;ll explore on my own
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Mobile desktop notice — only shown on small screens */}
       {mobileNoticeOpen && (
         <div className="fixed inset-0 z-50 flex items-end justify-center pb-10 px-6 min-[900px]:hidden">
@@ -160,6 +281,16 @@ export default function Home() {
           --red:     #ef4444;
         }
 
+        /* ── Demo button ── */
+        .demo-btn-home {
+          transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+        }
+        .demo-btn-home:hover {
+          transform: translateY(-2px);
+          border-color: rgba(255,255,255,1) !important;
+          box-shadow: 0 0 32px rgba(255,255,255,0.5), 0 0 65px rgba(255,255,255,0.22), 0 8px 24px rgba(0,0,0,0.5) !important;
+        }
+
         /* ── Upload card ── */
         .upload-card {
           transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
@@ -167,7 +298,7 @@ export default function Home() {
         .upload-card:hover {
           transform: translateY(-3px);
           border-color: rgba(235,200,150,0.9) !important;
-          box-shadow: 0 22px 55px rgba(0,0,0,0.6), 0 0 45px rgba(196,94,50,0.35) !important;
+          box-shadow: 0 22px 55px rgba(0,0,0,0.6), 0 0 45px rgba(120,60,200,0.35) !important;
         }
 
         /* ── Track rows ── */
@@ -175,7 +306,7 @@ export default function Home() {
           transition: background 0.12s, border-color 0.12s;
         }
         .track-row:hover {
-          background: rgba(196,94,50,0.06) !important;
+          background: rgba(120,60,200,0.06) !important;
           border-bottom-color: rgba(220,160,100,0.4) !important;
         }
 
@@ -184,16 +315,12 @@ export default function Home() {
           transition: background 0.15s;
         }
         .settings-btn:hover {
-          background: rgba(196,94,50,0.22) !important;
+          background: rgba(120,60,200,0.22) !important;
         }
 
-        /* ── Logo breathe ── */
+        /* ── Logo glow ── */
         .logo-glow {
-          animation: logo-breathe 6s ease-in-out infinite;
-        }
-        @keyframes logo-breathe {
-          0%,100% { opacity: 0.10; transform: scale(1); }
-          50%      { opacity: 0.26; transform: scale(1.15); }
+          opacity: 0.18;
         }
 
         /* ── LEDs ── */
@@ -205,7 +332,7 @@ export default function Home() {
         }
         .led-purple {
           background: var(--accent);
-          box-shadow: 0 0 6px var(--accent), 0 0 14px rgba(196,94,50,0.7);
+          box-shadow: 0 0 6px var(--accent), 0 0 14px rgba(120,60,200,0.7);
           animation: led-blink 1.6s ease-in-out infinite;
         }
         .led-green {
@@ -225,24 +352,51 @@ export default function Home() {
 
       <main
         className="relative h-screen overflow-hidden px-6 py-4 text-white"
-        style={{ fontFamily: "'Lora', serif", background: "#0f0c08" }}
+        style={{ fontFamily: "'Lora', serif", background: "#0a080f" }}
       >
 
         {/* ── Atmospheric background ── */}
         <div className="pointer-events-none fixed inset-0 overflow-hidden">
-          <div className="orb-1 absolute rounded-full" style={{ width: 1000, height: 1000, top: -400, left: -350, background: "radial-gradient(circle, rgba(196,94,50,0.28) 0%, rgba(160,60,20,0.10) 45%, transparent 70%)", filter: "blur(90px)" }} />
-          <div className="orb-2 absolute rounded-full" style={{ width: 700, height: 700, bottom: -200, right: -180, background: "radial-gradient(circle, rgba(184,120,40,0.18) 0%, transparent 65%)", filter: "blur(80px)" }} />
+          <div className="orb-1 absolute rounded-full" style={{ width: 1000, height: 1000, top: -400, left: -350, background: "radial-gradient(circle, rgba(120,60,200,0.28) 0%, rgba(90,30,160,0.10) 45%, transparent 70%)", filter: "blur(90px)" }} />
+          <div className="orb-2 absolute rounded-full" style={{ width: 700, height: 700, bottom: -200, right: -180, background: "radial-gradient(circle, rgba(100,50,180,0.18) 0%, transparent 65%)", filter: "blur(80px)" }} />
           <div className="absolute inset-0" style={{ background: "radial-gradient(ellipse at 30% 40%, transparent 30%, rgba(8,5,2,0.5) 75%, rgba(5,3,1,0.82) 100%)" }} />
           <div className="absolute inset-0" style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")`, backgroundSize: "256px 256px", opacity: 0.18, mixBlendMode: "overlay" }} />
         </div>
 
         <div className="relative mx-auto -mt-6 flex h-full w-full max-w-5xl flex-col items-center">
+
+          {/* Song Demos button — desktop only */}
+          <Link
+            href="/demo"
+            className="demo-btn-home fixed hidden min-[900px]:flex items-center gap-3 rounded-lg px-7 py-4"
+            style={{
+              top: "56px",
+              right: "120px",
+              transform: "translateY(-50%)",
+              border: "2.5px solid rgba(255,255,255,0.78)",
+              boxShadow: "0 0 22px rgba(255,255,255,0.28), 0 0 48px rgba(255,255,255,0.13), 0 6px 18px rgba(0,0,0,0.4)",
+              background: "rgba(255,255,255,0.04)",
+              backdropFilter: "blur(8px)",
+              zIndex: 40,
+            }}
+          >
+            <svg viewBox="0 0 24 24" className="h-5 w-5 shrink-0" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <polygon points="5 3 19 12 5 21 5 3" />
+            </svg>
+            <span
+              className="font-bold"
+              style={{ fontFamily: "'Courier Prime', monospace", letterSpacing: "0.1em", fontSize: "15px" }}
+            >
+              Song Demos
+            </span>
+          </Link>
+
           <div className="relative -top-8">
             {/* Logo */}
             <div className="relative -mb-3 flex justify-center">
               <div
                 className="logo-glow absolute inset-0 rounded-full blur-2xl"
-                style={{ background: "rgba(196,94,50,0.18)" }}
+                style={{ background: "rgba(120,60,200,0.18)" }}
               />
               <svg
                 viewBox="0 0 540 300"
@@ -301,9 +455,9 @@ export default function Home() {
                 htmlFor="fileUpload"
                 className="upload-card relative flex h-[182px] w-[275px] cursor-pointer flex-col items-center justify-center rounded py-5"
                 style={{
-                  background: "rgba(196,94,50,0.86)",
+                  background: "rgba(120,60,200,0.86)",
                   border: "1px solid rgba(235,200,150,0.75)",
-                  boxShadow: "0 18px 50px rgba(0,0,0,0.6), 0 0 35px rgba(196,94,50,0.28)",
+                  boxShadow: "0 18px 50px rgba(0,0,0,0.6), 0 0 35px rgba(120,60,200,0.28)",
                 }}
               >
                 <svg
@@ -331,6 +485,31 @@ export default function Home() {
             </div>
           </div>
 
+          {/* Song Demos button — mobile only */}
+          <div className="mb-2 -mt-3 flex w-full justify-center min-[900px]:hidden">
+            <Link
+              href="/demo"
+              className="demo-btn-home flex items-center justify-center gap-2.5 rounded-lg py-2.5"
+              style={{
+                width: "275px",
+                border: "2.5px solid rgba(255,255,255,0.78)",
+                boxShadow: "0 0 18px rgba(255,255,255,0.25), 0 0 40px rgba(255,255,255,0.12), 0 4px 16px rgba(0,0,0,0.4)",
+                background: "rgba(255,255,255,0.04)",
+                backdropFilter: "blur(8px)",
+              }}
+            >
+              <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <polygon points="5 3 19 12 5 21 5 3" />
+              </svg>
+              <span
+                className="font-bold"
+                style={{ fontFamily: "'Courier Prime', monospace", letterSpacing: "0.1em", fontSize: "13px" }}
+              >
+                Song Demos
+              </span>
+            </Link>
+          </div>
+
           {/* Track list panel */}
           <div
             className="flex min-h-0 w-full flex-1 px-2 pt-1"
@@ -352,9 +531,9 @@ export default function Home() {
                     <Link
                       href="/songs"
                       className="mt-1 block text-xs"
-                      style={{ color: "rgba(220,180,140,0.35)", transition: "color 0.15s", fontFamily: "'Courier Prime', monospace", letterSpacing: "0.1em" }}
+                      style={{ color: "rgba(190,160,230,0.35)", transition: "color 0.15s", fontFamily: "'Courier Prime', monospace", letterSpacing: "0.1em" }}
                       onMouseEnter={e => (e.currentTarget.style.color = "#C45A2A")}
-                      onMouseLeave={e => (e.currentTarget.style.color = "rgba(220,180,140,0.35)")}
+                      onMouseLeave={e => (e.currentTarget.style.color = "rgba(190,160,230,0.35)")}
                     >
                       VIEW ALL →
                     </Link>
@@ -403,9 +582,9 @@ export default function Home() {
                             }}
                             className="settings-btn flex h-8 w-8 items-center justify-center rounded-md"
                             style={{
-                              background: "rgba(196,94,50,0.14)",
+                              background: "rgba(120,60,200,0.14)",
                               color: "#f0e4d0",
-                              boxShadow: "0 0 0 1px rgba(196,94,50,0.28)",
+                              boxShadow: "0 0 0 1px rgba(120,60,200,0.28)",
                             }}
                             aria-label={`Open settings for ${track.name}`}
                           >
@@ -447,7 +626,7 @@ export default function Home() {
                 })}
 
                 {songs.length === 0 && (
-                  <p className="py-8 text-center text-sm" style={{ color: "rgba(220,180,140,0.3)", fontStyle: "italic" }}>
+                  <p className="py-8 text-center text-sm" style={{ color: "rgba(190,160,230,0.3)", fontStyle: "italic" }}>
                     Upload a track to start your library.
                   </p>
                 )}
@@ -455,6 +634,92 @@ export default function Home() {
             </div>
           </div>
         </div>
+
+        {/* Bottom-right button group */}
+        <div className="fixed bottom-5 right-5 z-50 flex items-center gap-2">
+            {/* How it works */}
+            <button
+                type="button"
+                onClick={() => setTourModalOpen(true)}
+                className="flex items-center justify-center rounded-full border border-white/30 bg-black/70 backdrop-blur-sm transition-all hover:text-white hover:border-white/60"
+                style={{ width: 32, height: 32, fontFamily: "'Rajdhani', sans-serif", boxShadow: "0 0 10px rgba(255,255,255,0.25), 0 0 22px rgba(255,255,255,0.10)", fontSize: 15, fontWeight: 700, color: "rgba(255,255,255,0.8)" }}
+                aria-label="How it works"
+                title="How it works"
+            >
+                ?
+            </button>
+
+            {/* Feedback */}
+            <button
+                type="button"
+                onClick={() => setFeedbackOpen(true)}
+                className="flex items-center gap-2 rounded-lg border border-white/30 bg-black/70 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-white/80 transition-all hover:text-white hover:border-white/60 backdrop-blur-sm"
+                style={{ fontFamily: "'Rajdhani', sans-serif", boxShadow: "0 0 10px rgba(255,255,255,0.25), 0 0 22px rgba(255,255,255,0.10)" }}
+            >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                Share feedback
+            </button>
+        </div>
+
+        {/* Feedback modal */}
+        {feedbackOpen && (
+            <div
+                className="fixed inset-0 z-[60] flex items-center justify-center"
+                style={{ background: "rgba(0,0,0,0.65)", backdropFilter: "blur(4px)" }}
+                onClick={(e) => { if (e.target === e.currentTarget) setFeedbackOpen(false); }}
+            >
+                <div
+                    className="w-full max-w-[480px] mx-4 rounded-2xl border border-white/12 shadow-[0_24px_60px_rgba(0,0,0,0.5)]"
+                    style={{ background: "#111111", fontFamily: "'IBM Plex Mono', monospace" }}
+                >
+                    {feedbackState.succeeded ? (
+                        <div className="flex flex-col items-center gap-3 px-8 py-10 text-center">
+                            <div className="text-2xl font-bold text-white" style={{ fontFamily: "'Rajdhani', sans-serif" }}>Thanks!</div>
+                            <p className="text-[13px] text-white/55">Your feedback helps make JAM better.</p>
+                            <button
+                                type="button"
+                                onClick={() => setFeedbackOpen(false)}
+                                className="mt-2 rounded-lg px-6 py-2 text-[11px] font-semibold uppercase tracking-[0.14em] transition"
+                                style={{ fontFamily: "'Rajdhani', sans-serif", background: "#ffffff", color: "#111111" }}
+                            >
+                                Close
+                            </button>
+                        </div>
+                    ) : (
+                        <form onSubmit={submitFeedback} className="flex flex-col px-6 py-6 gap-4">
+                            <div className="flex items-start justify-between">
+                                <div>
+                                    <div className="text-[16px] font-bold text-white" style={{ fontFamily: "'Rajdhani', sans-serif", letterSpacing: "0.06em" }}>Got thoughts? We&apos;re listening.</div>
+                                    <div className="mt-0.5 text-[11px] text-white/40">Feature requests, bugs, ideas — all welcome.</div>
+                                </div>
+                                <button type="button" onClick={() => setFeedbackOpen(false)} className="text-white/30 hover:text-white/70 transition text-lg leading-none ml-4">✕</button>
+                            </div>
+                            <div className="flex flex-col gap-1">
+                                <textarea
+                                    autoFocus
+                                    id="message"
+                                    name="message"
+                                    placeholder="Tell us what's on your mind…"
+                                    rows={5}
+                                    required
+                                    className="w-full resize-none rounded-lg border border-white/12 bg-white/5 px-4 py-3 text-[12px] text-white placeholder-white/25 outline-none focus:border-white/25 transition"
+                                    style={{ fontFamily: "'IBM Plex Mono', monospace" }}
+                                />
+                                <ValidationError field="message" errors={feedbackState.errors} className="text-[11px] text-red-400" />
+                            </div>
+                            <button
+                                type="submit"
+                                disabled={feedbackState.submitting}
+                                className="rounded-lg py-2.5 text-[11px] font-semibold uppercase tracking-[0.16em] transition disabled:opacity-40"
+                                style={{ fontFamily: "'Rajdhani', sans-serif", background: "#ffffff", color: "#111111" }}
+                            >
+                                {feedbackState.submitting ? "Sending…" : "Send Feedback"}
+                            </button>
+                        </form>
+                    )}
+                </div>
+            </div>
+        )}
 
         {/* Context menu */}
         {openMenuIndex !== null && menuPosition && (
@@ -471,12 +736,12 @@ export default function Home() {
               left: menuPosition.left - 200,
               transform: "translateY(-50%)",
               background: "rgba(12,7,3,0.97)",
-              border: "1px solid rgba(196,94,50,0.28)",
+              border: "1px solid rgba(120,60,200,0.28)",
               boxShadow: "0 20px 50px rgba(0,0,0,0.7)",
               backdropFilter: "blur(16px)",
             }}
           >
-            <div className="mb-2 px-2 text-xs" style={{ color: "rgba(220,180,140,0.45)", fontFamily: "'Lora', serif", letterSpacing: "0.08em" }}>
+            <div className="mb-2 px-2 text-xs" style={{ color: "rgba(190,160,230,0.45)", fontFamily: "'Lora', serif", letterSpacing: "0.08em" }}>
               Song Settings
             </div>
 
@@ -491,7 +756,7 @@ export default function Home() {
                 onClick={onClick}
                 className="w-full rounded px-2 py-2 text-left text-sm"
                 style={{ color: "#f5ede0", fontFamily: "'Lora', serif", background: "none", border: "none", cursor: "pointer", transition: "background 0.1s" }}
-                onMouseEnter={e => { e.currentTarget.style.background = "rgba(196,94,50,0.14)"; }}
+                onMouseEnter={e => { e.currentTarget.style.background = "rgba(120,60,200,0.14)"; }}
                 onMouseLeave={e => { e.currentTarget.style.background = "none"; }}
               >
                 {label}

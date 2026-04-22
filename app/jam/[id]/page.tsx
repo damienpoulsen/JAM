@@ -2,24 +2,31 @@
 
 import { use } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useForm, ValidationError } from "@formspree/react";
 import ChordDisplay from "./components/ChordDisplay";
 import ColorWheelPicker from "./components/ColorWheelPicker";
 import Fretboard from "./components/Fretboard";
+import LeftMenuPanel from "./components/LeftMenuPanel";
+import OnboardingTour from "./components/OnboardingTour";
 import OverlayControls from "./components/OverlayControls";
 import PlaybackControls from "./components/PlaybackControls";
 import MobileFretboardSettings from "./components/MobileFretboardSettings";
 import MobilePlaybackControls from "./components/MobilePlaybackControls";
 import {
     buildLayer,
-    LAYER_OPTIONS,
-    normalizeLayerConfig,
-    type LayerConfig,
-    type LayerSlot,
+    theorySettingsToLayerConfigs,
+    applyTheoryPreset,
+    DEFAULT_THEORY,
+    type TheorySettings,
+    type TheoryPreset,
+    type Layer,
 } from "@/lib/layers";
 import { mergeLayers } from "../../../lib/layerManager";
 import { getSongAnalysis, type AnalysisChordEvent } from "../../../lib/analysis";
-import { getFile } from "../../../lib/db";
+import { getFile, saveFile } from "../../../lib/db";
 import { readSongs, SONGS_STORAGE_KEY, type Song, writeSongs } from "../../../lib/songs";
+
+const PUBLIC_ANALYSIS_API_URL = process.env.NEXT_PUBLIC_ANALYSIS_API_URL?.replace(/\/$/, "") ?? "";
 
 const emptySong: Song = {
     name: "",
@@ -30,7 +37,6 @@ const emptySong: Song = {
     analysisStatus: "ready",
 };
 
-const SLOT_ORDER: LayerSlot[] = ["primary", "secondary", "tertiary"];
 type NoteDisplayMode = "notes" | "intervals";
 type LoopRange = { start: number; end: number };
 type PanelView = "main" | "page-bg" | "fretboard" | "control-center" | "playback" | "chord-display";
@@ -115,7 +121,13 @@ function normalizeChordTimeline(timeline: AnalysisChordEvent[] | undefined): Ana
         .sort((a, b) => a.time - b.time);
 }
 
+// Show chords slightly early so the visual change feels in sync with the audio.
+// Human auditory processing has ~50ms latency, so displaying 50ms ahead compensates.
+const CHORD_LOOKAHEAD_SECONDS = 0.10;
+
 function getChordDisplayState(timeline: AnalysisChordEvent[], playbackTime: number) {
+    const lookupTime = playbackTime + CHORD_LOOKAHEAD_SECONDS;
+
     if (timeline.length === 0) {
         return {
             currentChord: "",
@@ -124,7 +136,7 @@ function getChordDisplayState(timeline: AnalysisChordEvent[], playbackTime: numb
         };
     }
 
-    if (playbackTime < timeline[0].time) {
+    if (lookupTime < timeline[0].time) {
         return {
             currentChord: "",
             nextChord: timeline[0].chord,
@@ -133,7 +145,7 @@ function getChordDisplayState(timeline: AnalysisChordEvent[], playbackTime: numb
     }
 
     for (let index = timeline.length - 1; index >= 0; index -= 1) {
-        if (playbackTime >= timeline[index].time) {
+        if (lookupTime >= timeline[index].time) {
             return {
                 currentChord: timeline[index].chord,
                 nextChord: timeline[index + 1]?.chord || "",
@@ -204,6 +216,18 @@ function formatDisplayedBpmValue(value: number | string | null | undefined): num
     return "--";
 }
 
+function readTheorySettings(songId: string): TheorySettings {
+    if (typeof window === "undefined") return DEFAULT_THEORY;
+    try {
+        const stored = localStorage.getItem(`jam-theory-${songId}`);
+        return stored ? (JSON.parse(stored) as TheorySettings) : DEFAULT_THEORY;
+    } catch { return DEFAULT_THEORY; }
+}
+
+function saveTheorySettings(songId: string, settings: TheorySettings): void {
+    try { localStorage.setItem(`jam-theory-${songId}`, JSON.stringify(settings)); } catch {}
+}
+
 function readSongRecord(id: string): { song: Song; found: boolean } {
     if (typeof window === "undefined") {
         return {
@@ -263,10 +287,17 @@ function saveSong(updatedSong: Song) {
 
 export default function Page({ params }: { params: Promise<{ id: string }> }) {
     const { id } = use(params);
+    const [tourActive, setTourActive] = useState(false);
+    useEffect(() => {
+        if (new URLSearchParams(window.location.search).get("tour") === "true") {
+            setTourActive(true);
+        }
+    }, []);
     const audioRef = useRef<HTMLAudioElement | null>(null);
     const metronomeAudioContextRef = useRef<AudioContext | null>(null);
     const metronomeBufferRef = useRef<AudioBuffer | null>(null);
     const metronomeIntervalRef = useRef<number | null>(null);
+    const skipAudioResetRef = useRef(false);
     const songRecord = useMemo(() => readSongRecord(id), [id]);
 
     const [songDrafts, setSongDrafts] = useState<Record<string, Song>>({});
@@ -282,6 +313,11 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
     const [tempoDisplayMode, setTempoDisplayMode] = useState<"percent" | "bpm">("percent");
     const [metronomeEnabled, setMetronomeEnabled] = useState(false);
     const [metronomeOpen, setMetronomeOpen] = useState(false);
+    const [voxRemoval, setVoxRemoval] = useState(false);
+    const [voxLoading, setVoxLoading] = useState(false);
+    const [voxError, setVoxError] = useState("");
+    const [instrumentalURL, setInstrumentalURL] = useState("");
+    const [leftPanelOpen, setLeftPanelOpen] = useState(false);
     const [panelOpen, setPanelOpen] = useState(false);
     const [panelView, setPanelView] = useState<PanelView>("main");
     const [boardColor, setBoardColor] = useState("#fce6c5");
@@ -304,11 +340,10 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
     const [editingName, setEditingName] = useState(false);
     const [volumeOpen, setVolumeOpen] = useState(false);
     const [mobileSettingsOpen, setMobileSettingsOpen] = useState(false);
+    const [feedbackOpen, setFeedbackOpen] = useState(false);
+    const [feedbackState, submitFeedback] = useForm("maqadgga");
     const [keyOpen, setKeyOpen] = useState(false);
-    const [layersOpen, setLayersOpen] = useState(false);
-    const [layerConfigs, setLayerConfigs] = useState<LayerConfig[]>(() => [
-        normalizeLayerConfig({ slot: "primary", kind: "pentatonic", color: "#000000" }, "primary"),
-    ]);
+    const [theorySettings, setTheorySettings] = useState<TheorySettings>(() => readTheorySettings(id));
     const [loopMode, setLoopMode] = useState(false);
     const [loopRange, setLoopRange] = useState<LoopRange | null>(null);
     const [loopDraft, setLoopDraft] = useState<LoopRange | null>(null);
@@ -376,23 +411,12 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
         () => getChordDisplayState(chordTimeline, currentTime),
         [chordTimeline, currentTime]
     );
-    const normalizedLayerConfigs = useMemo(
-        () => layerConfigs.map((config, index) => normalizeLayerConfig(config, SLOT_ORDER[index] ?? "tertiary")),
-        [layerConfigs]
-    );
-
-    // Theory overlay pipeline: selected layer config -> built pitch classes -> merged display notes.
     const layers = useMemo(
         () =>
-            normalizedLayerConfigs
-                .map((config) =>
-                    buildLayer(config, {
-                        songKey: song.key,
-                        currentChord,
-                    })
-                )
-                .filter((layer) => layer !== null),
-        [currentChord, normalizedLayerConfigs, song.key]
+            theorySettingsToLayerConfigs(theorySettings)
+                .map((config) => buildLayer(config, { songKey: song.key, currentChord }))
+                .filter((l): l is Layer => l !== null),
+        [theorySettings, currentChord, song.key]
     );
 
     const mergedNotes = useMemo(() => mergeLayers(layers), [layers]);
@@ -405,12 +429,6 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
         [currentChord, song.key]
     );
 
-    const getLayerBorderColor = (fillLayers: (typeof mergedNotes)[number]["layers"]) =>
-        fillLayers[1]?.style.fill ?? fillLayers[0]?.style.borderColor ?? "#f8fafc";
-    const getLayerBorderStyle = (fillLayers: (typeof mergedNotes)[number]["layers"], borderWidth: number) =>
-        fillLayers.length > 1
-            ? `${borderWidth}px solid ${getLayerBorderColor(fillLayers)}`
-            : "none";
     const getDisplayedFretboardLabel = (noteIndex: number) => {
         if (noteDisplayMode === "notes" || displayReferenceNoteIndex === null) {
             return notes[noteIndex];
@@ -459,43 +477,6 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
         }));
         saveSong(nextSong);
     }, [id, song]);
-
-    const updateLayerConfig = <K extends keyof LayerConfig>(
-        slot: LayerSlot,
-        key: K,
-        value: LayerConfig[K]
-    ) => {
-        setLayerConfigs((currentLayers) =>
-            currentLayers.map((layer) =>
-                layer.slot === slot
-                    ? normalizeLayerConfig({ ...layer, [key]: value }, layer.slot)
-                    : layer
-            )
-        );
-    };
-
-    const reindexLayerSlots = (configs: LayerConfig[]) =>
-        configs.map((config, index) => ({
-            ...normalizeLayerConfig(config, SLOT_ORDER[index]),
-            slot: SLOT_ORDER[index],
-        }));
-
-    const addLayer = () => {
-        setLayerConfigs((currentLayers) => {
-            if (currentLayers.length >= SLOT_ORDER.length) {
-                return currentLayers;
-            }
-
-            return [
-                ...currentLayers,
-                {
-                    slot: SLOT_ORDER[currentLayers.length],
-                    kind: "off",
-                    color: "#22c55e",
-                }
-            ];
-        });
-    };
 
     const applyPreset = (preset: ColorPreset) => {
         setBgColor(preset.bgColor);
@@ -554,16 +535,8 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
         setPlaybackRate(Number(normalizedRate.toFixed(2)));
     };
 
-    const removeLayer = (slot: LayerSlot) => {
-        setLayerConfigs((currentLayers) => {
-            if (currentLayers.length <= 1) {
-                return currentLayers;
-            }
-
-            const filteredLayers = currentLayers.filter((layer) => layer.slot !== slot);
-            return reindexLayerSlots(filteredLayers);
-        });
-    };
+    useEffect(() => { setTheorySettings(readTheorySettings(id)); }, [id]);
+    useEffect(() => { saveTheorySettings(id, theorySettings); }, [id, theorySettings]);
 
     useEffect(() => {
         if (typeof screen !== "undefined" && "orientation" in screen) {
@@ -640,6 +613,7 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
             setCurrentTime(audio.duration || 0);
         };
         const onSourceReset = () => {
+            if (skipAudioResetRef.current) return;
             setIsPlaying(false);
             setCurrentTime(0);
             setDuration(0);
@@ -712,6 +686,91 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
         audio.volume = masterVolume;
     }, [audioURL, masterVolume]);
 
+    useEffect(() => {
+        if (!voxError) return;
+        const id = setTimeout(() => setVoxError(""), 7000);
+        return () => clearTimeout(id);
+    }, [voxError]);
+
+    // Clean up instrumental blob URL when song changes or component unmounts
+    useEffect(() => {
+        return () => {
+            if (instrumentalURL) URL.revokeObjectURL(instrumentalURL);
+        };
+    }, [instrumentalURL]);
+
+    const toggleVoxRemoval = useCallback(async () => {
+        const audio = audioRef.current;
+        if (!audio) return;
+
+        const savedTime = audio.currentTime;
+        const wasPlaying = !audio.paused;
+
+        const applySrc = (newSrc: string) => {
+            skipAudioResetRef.current = true;
+            audio.src = newSrc;
+            audio.addEventListener("canplay", () => {
+                skipAudioResetRef.current = false;
+                audio.currentTime = savedTime;
+                if (wasPlaying) void audio.play();
+            }, { once: true });
+        };
+
+        if (voxRemoval) {
+            applySrc(audioURL);
+            setVoxRemoval(false);
+            setInstrumentalURL("");
+            return;
+        }
+
+        // Try cache first (no pause needed — instant switch)
+        const instrKey = `${song.fileId}-instrumental`;
+        const cached = await getFile(instrKey);
+
+        if (cached) {
+            const url = URL.createObjectURL(cached);
+            if (instrumentalURL) URL.revokeObjectURL(instrumentalURL);
+            applySrc(url);
+            setInstrumentalURL(url);
+            setVoxRemoval(true);
+            return;
+        }
+
+        // Not cached — run Demucs (pause while processing)
+        setVoxLoading(true);
+        if (wasPlaying) audio.pause();
+
+        try {
+            const originalFile = await getFile(song.fileId);
+            if (!originalFile) throw new Error("Audio file unavailable");
+
+            const fd = new FormData();
+            fd.append("file", originalFile);
+
+            const endpoint = PUBLIC_ANALYSIS_API_URL
+                ? `${PUBLIC_ANALYSIS_API_URL}/extract-stems`
+                : "/api/extract-stems";
+
+            const res = await fetch(endpoint, { method: "POST", body: fd });
+            if (!res.ok) throw new Error("Stem extraction failed — try again.");
+
+            const blob = await res.blob();
+            await saveFile(instrKey, new File([blob], "instrumental.wav", { type: "audio/wav" }));
+
+            const url = URL.createObjectURL(blob);
+            if (instrumentalURL) URL.revokeObjectURL(instrumentalURL);
+            applySrc(url);
+            setInstrumentalURL(url);
+            setVoxRemoval(true);
+        } catch (err) {
+            const msg = err instanceof Error ? err.message : "VOX removal failed";
+            setVoxError(msg);
+            if (wasPlaying) void audio.play();
+        } finally {
+            setVoxLoading(false);
+        }
+    }, [voxRemoval, instrumentalURL, audioURL, song.fileId]);
+
     const togglePlay = () => {
         const audio = audioRef.current;
         if (!audio || !isAudioAvailable) {
@@ -724,6 +783,13 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
             audio.pause();
         }
     };
+
+    const handleTourRequestPlay = useCallback(() => {
+        const audio = audioRef.current;
+        if (audio && isAudioAvailable && audio.paused) {
+            void audio.play();
+        }
+    }, [isAudioAvailable]);
 
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
@@ -891,15 +957,23 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
                     }}
                 />
             )}
-            <audio key={`${id}:${song.fileId || "no-file"}`} ref={audioRef} src={isAudioAvailable ? audioURL : undefined} />
+            <audio key={`${id}:${song.fileId || "no-file"}`} ref={audioRef} src={voxRemoval && instrumentalURL ? instrumentalURL : (isAudioAvailable ? audioURL : undefined)} />
+
+            {/* Backdrop for right customization panel */}
+            {panelOpen && (
+                <div
+                    className="absolute inset-0 z-[39] hidden min-[900px]:block"
+                    onClick={() => setPanelOpen(false)}
+                />
+            )}
 
             {/* Left panel + handle (slide together) */}
             <div
-                className="absolute top-0 left-0 z-40 h-full transition-all duration-300 hidden min-[900px]:block"
-                style={{ transform: panelOpen ? "translateX(0)" : "translateX(-240px)" }}
+                className="absolute top-0 right-0 z-40 h-full transition-all duration-300 hidden min-[900px]:block"
+                style={{ transform: panelOpen ? "translateX(0)" : "translateX(240px)" }}
             >
                 {/* Panel content */}
-                <div className="h-full w-[240px] overflow-hidden border-r transition-colors duration-300" style={{ background: leftBarColor, borderColor: panel.border }}>
+                <div className="h-full w-[240px] overflow-hidden border-l transition-colors duration-300" style={{ background: leftBarColor, borderColor: panel.border }}>
                     <div className="flex h-full flex-col overflow-y-auto">
 
                         {panelView === "main" ? (
@@ -1128,29 +1202,55 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
                     </div>
                 </div>
 
-                {/* Handle — rides on the right edge of the panel */}
+                {/* Handle — rides on the left edge of the panel */}
                 <div
-                    className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-full cursor-pointer"
+                    className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-full cursor-pointer"
                     onClick={(e) => { e.stopPropagation(); setPanelOpen(!panelOpen); }}
                 >
                     <div
-                        className="flex h-[40vh] w-[28px] items-center justify-center rounded-r-xl select-none"
+                        className="flex h-[40vh] w-[28px] items-center justify-center rounded-l-xl select-none"
                         style={{
                             background: leftBarColor,
                             borderTop: "1.5px solid #f4f4f5",
-                            borderRight: "1.5px solid #f4f4f5",
+                            borderLeft: "1.5px solid #f4f4f5",
                             borderBottom: "1.5px solid #f4f4f5",
                             color: panel.text,
                         }}
                     >
-                        {panelOpen ? "◀" : "▶"}
+                        {panelOpen ? "▶" : "◀"}
                     </div>
                 </div>
             </div>
 
+            {/* Hamburger button — desktop, right of JAM logo, z-50 to stay above content */}
+            <button
+                type="button"
+                onClick={() => setLeftPanelOpen(true)}
+                className={`absolute top-[18px] left-[136px] z-50 flex-col items-center justify-center gap-[5px] rounded-lg p-2 transition-opacity hover:opacity-70 ${leftPanelOpen ? "hidden" : "hidden min-[900px]:flex"}`}
+                aria-label="Open menu"
+                style={{ color: "rgba(255,255,255,0.5)" }}
+            >
+                <span className="block h-[2px] w-[18px] rounded-full bg-current" />
+                <span className="block h-[2px] w-[18px] rounded-full bg-current" />
+                <span className="block h-[2px] w-[18px] rounded-full bg-current" />
+            </button>
+
+            {/* Left menu panel */}
+            <LeftMenuPanel
+                isOpen={leftPanelOpen}
+                onClose={() => setLeftPanelOpen(false)}
+                panelColors={panel}
+                leftBarColor={leftBarColor}
+                theorySettings={theorySettings}
+                onTheoryChange={setTheorySettings}
+                songName={song.name}
+                songId={id}
+                onStartTour={() => setTourActive(true)}
+            />
+
             <div className="hidden min-[900px]:flex relative h-full flex-col px-8 pt-0 pb-2">
                 {/* Header / app branding */}
-                <div className="flex items-center justify-between pb-2 pt-2">
+                <div className="flex items-center pb-2 pt-2 gap-3">
                     <div className="cursor-pointer select-none">
                         <svg viewBox="0 0 540 300" xmlns="http://www.w3.org/2000/svg" className="h-auto w-[100px]" aria-label="JAM">
                             <defs>
@@ -1207,26 +1307,21 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
                                     <OverlayControls
                                         barColor={controlCenterColor}
                                         audioError={visibleAudioError}
-                                        canAddLayer={normalizedLayerConfigs.length < SLOT_ORDER.length}
-                                        layerConfigs={normalizedLayerConfigs}
-                                        layersOpen={layersOpen}
+                                        theorySettings={theorySettings}
+                                        onTheoryChange={setTheorySettings}
                                         loopMode={loopMode}
                                         metronomeBpm={metronomeBpm}
                                         metronomeEnabled={metronomeEnabled}
                                         metronomeOpen={metronomeOpen}
                                         noteDisplayMode={noteDisplayMode}
-                                        onAddLayer={addLayer}
                                         onDecreaseTempo={() => updatePlaybackRate(playbackRate - 0.1)}
                                         onIncreaseTempo={() => updatePlaybackRate(playbackRate + 0.1)}
-                                        onLayerColorChange={(slot, color) => updateLayerConfig(slot, "color", color)}
-                                        onLayerKindChange={(slot, kind) => updateLayerConfig(slot, "kind", kind)}
                                         onDecreaseMetronomeBpm={() =>
                                             setMetronomeBpmOverride({
                                                 songId: id,
                                                 bpm: Math.max(30, metronomeBpm - 1),
                                             })
                                         }
-                                        onRemoveLayer={removeLayer}
                                         onTempoDisplayModeChange={setTempoDisplayMode}
                                         onIncreaseMetronomeBpm={() =>
                                             setMetronomeBpmOverride({
@@ -1234,7 +1329,6 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
                                                 bpm: Math.min(260, metronomeBpm + 1),
                                             })
                                         }
-                                        onToggleLayersOpen={() => setLayersOpen((current) => !current)}
                                         onToggleLoopMode={toggleLoopMode}
                                         onToggleMetronome={() => setMetronomeEnabled((current) => !current)}
                                         onToggleMetronomeOpen={() => setMetronomeOpen((current) => !current)}
@@ -1243,11 +1337,16 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
                                                 currentMode === "notes" ? "intervals" : "notes"
                                             )
                                         }
+                                        voxRemoval={voxRemoval}
+                                        voxLoading={voxLoading}
+                                        voxError={voxError}
+                                        onToggleVoxRemoval={() => { void toggleVoxRemoval(); }}
                                         playbackRate={playbackRate}
                                         tempoDisplayMode={tempoDisplayMode}
                                         baseBpm={displayBpm === "--" ? null : typeof displayBpm === "number" ? displayBpm : Number(displayBpm) || null}
                                     />
 
+                                    <div data-tour="fretboard">
                                     <Fretboard
                                         boardColorOverride={boardColor}
                                         stringColorOverride={stringColor}
@@ -1257,12 +1356,13 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
                                         fretMarkers={fretMarkers}
                                         frets={frets}
                                         getDisplayedFretboardLabel={getDisplayedFretboardLabel}
-                                        getLayerBorderStyle={getLayerBorderStyle}
                                         mergedNoteMap={mergedNoteMap}
+                                        overlayFilled={theorySettings.overlayFilled}
                                         strings={strings}
                                         tuning={tuning}
                                         tuningIndex={tuningIndex}
                                     />
+                                    </div>
 
                                     <PlaybackControls
                                         barColor={playheadColor}
@@ -1437,6 +1537,77 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
                 </div>
             </div>
 
+            {/* ── Feedback button (fixed bottom-right) ── */}
+            <button
+                type="button"
+                onClick={() => setFeedbackOpen(true)}
+                className="fixed bottom-20 right-5 z-50 hidden min-[900px]:flex items-center gap-2 rounded-lg border border-white/30 bg-black/70 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-white/80 transition-all hover:text-white hover:border-white/60 backdrop-blur-sm"
+                style={{ fontFamily: "'Rajdhani', sans-serif", boxShadow: "0 0 10px rgba(255,255,255,0.25), 0 0 22px rgba(255,255,255,0.10)" }}
+            >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                Share feedback
+            </button>
+
+            {/* ── Feedback modal ── */}
+            {feedbackOpen && (
+                <div
+                    className="fixed inset-0 z-[60] flex items-center justify-center"
+                    style={{ background: "rgba(0,0,0,0.65)", backdropFilter: "blur(4px)" }}
+                    onClick={(e) => { if (e.target === e.currentTarget) setFeedbackOpen(false); }}
+                >
+                    <div
+                        className="w-full max-w-[480px] mx-4 rounded-2xl border border-white/12 shadow-[0_24px_60px_rgba(0,0,0,0.5)]"
+                        style={{ background: "#111111", fontFamily: "'IBM Plex Mono', monospace" }}
+                    >
+                        {feedbackState.succeeded ? (
+                            <div className="flex flex-col items-center gap-3 px-8 py-10 text-center">
+                                <div className="text-2xl font-bold text-white" style={{ fontFamily: "'Rajdhani', sans-serif" }}>Thanks!</div>
+                                <p className="text-[13px] text-white/55">Your feedback helps make JAM better.</p>
+                                <button
+                                    type="button"
+                                    onClick={() => setFeedbackOpen(false)}
+                                    className="mt-2 rounded-lg px-6 py-2 text-[11px] font-semibold uppercase tracking-[0.14em] transition"
+                                    style={{ fontFamily: "'Rajdhani', sans-serif", background: "#ffffff", color: "#111111" }}
+                                >
+                                    Close
+                                </button>
+                            </div>
+                        ) : (
+                            <form onSubmit={submitFeedback} className="flex flex-col px-6 py-6 gap-4">
+                                <div className="flex items-start justify-between">
+                                    <div>
+                                        <div className="text-[16px] font-bold text-white" style={{ fontFamily: "'Rajdhani', sans-serif", letterSpacing: "0.06em" }}>Got thoughts? We&apos;re listening.</div>
+                                        <div className="mt-0.5 text-[11px] text-white/40">Feature requests, bugs, ideas — all welcome.</div>
+                                    </div>
+                                    <button type="button" onClick={() => setFeedbackOpen(false)} className="text-white/30 hover:text-white/70 transition text-lg leading-none ml-4">✕</button>
+                                </div>
+                                <div className="flex flex-col gap-1">
+                                    <textarea
+                                        autoFocus
+                                        id="message"
+                                        name="message"
+                                        placeholder="Tell us what's on your mind…"
+                                        rows={5}
+                                        required
+                                        className="w-full resize-none rounded-lg border border-white/12 bg-white/5 px-4 py-3 text-[12px] text-white placeholder-white/25 outline-none focus:border-white/25 transition"
+                                        style={{ fontFamily: "'IBM Plex Mono', monospace" }}
+                                    />
+                                    <ValidationError field="message" errors={feedbackState.errors} className="text-[11px] text-red-400" />
+                                </div>
+                                <button
+                                    type="submit"
+                                    disabled={feedbackState.submitting}
+                                    className="rounded-lg py-2.5 text-[11px] font-semibold uppercase tracking-[0.16em] transition disabled:opacity-40"
+                                    style={{ fontFamily: "'Rajdhani', sans-serif", background: "#ffffff", color: "#111111" }}
+                                >
+                                    {feedbackState.submitting ? "Sending…" : "Send Feedback"}
+                                </button>
+                            </form>
+                        )}
+                    </div>
+                </div>
+            )}
+
             {/* ── Mobile layout (phones only, desktop untouched above) ── */}
             <div className="flex min-[900px]:hidden h-full flex-col overflow-hidden">
 
@@ -1446,6 +1617,7 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
                     onClick={() => setMobileSettingsOpen(true)}
                     className="absolute top-4 right-4 z-30 flex h-9 w-9 flex-col items-center justify-center gap-[5px] rounded-lg border border-white/25 bg-black/40"
                     aria-label="Settings"
+                    data-tour="layers"
                 >
                     <span className="block h-[2px] w-4 rounded-full bg-white/75" />
                     <span className="block h-[2px] w-4 rounded-full bg-white/75" />
@@ -1454,6 +1626,7 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
 
                 {/* Chord display — top ~28%, pushed toward bottom of section */}
                 <div className="flex h-[28%] flex-col items-center justify-end pb-3 px-4">
+                    <div data-tour="chords" className="flex flex-col items-center">
                     <div
                         className="text-[clamp(6rem,29vw,12rem)] font-bold leading-none text-center drop-shadow-[0_4px_12px_rgba(0,0,0,0.3)]"
                         style={{ color: chordDisplayColor || "#ffffff", fontFamily: "'Playfair Display', serif" }}
@@ -1466,21 +1639,28 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
                     >
                         {nextChord || ""}
                     </div>
+                    </div>
                 </div>
 
                 {/* Fretboard — flex-1, pushed to bottom, horizontal scroll only */}
-                <div className="flex flex-col flex-1 overflow-hidden min-h-0 justify-end pb-2">
-                    {/* Theory layer select */}
-                    <div className="flex shrink-0 items-center px-3 pb-1">
+                <div className="flex flex-col flex-1 overflow-hidden min-h-0 justify-end pb-2" data-tour="fretboard">
+                    {/* Theory preset select */}
+                    <div className="flex shrink-0 items-center px-3 pb-1" data-tour="layers-btn">
                         <select
-                            value={normalizedLayerConfigs[0]?.kind ?? "off"}
-                            onChange={(e) => updateLayerConfig("primary", "kind", e.target.value as LayerConfig["kind"])}
+                            value={theorySettings.preset}
+                            onChange={(e) => {
+                                const val = e.target.value;
+                                if (val === "custom") return;
+                                setTheorySettings((s) => applyTheoryPreset(val as TheoryPreset, s));
+                            }}
                             className="rounded-lg border border-white/25 bg-black/60 px-2.5 py-1.5 text-[11px] font-bold uppercase tracking-[0.1em] text-white/85 outline-none"
                             style={{ fontFamily: "'Rajdhani', sans-serif" }}
                         >
-                            {LAYER_OPTIONS.map((opt) => (
-                                <option key={opt.value} value={opt.value}>{opt.label}</option>
-                            ))}
+                            <option value="pentatonic-solo">Pentatonic Solo</option>
+                            <option value="target-notes">Target Notes</option>
+                            <option value="song-view">Song View</option>
+                            <option value="chord-only">Chord Only</option>
+                            {theorySettings.preset === "custom" && <option value="custom">Custom</option>}
                         </select>
                     </div>
                     <div className="overflow-x-auto overflow-y-hidden">
@@ -1495,8 +1675,8 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
                                 fretMarkers={fretMarkers}
                                 frets={frets}
                                 getDisplayedFretboardLabel={getDisplayedFretboardLabel}
-                                getLayerBorderStyle={getLayerBorderStyle}
                                 mergedNoteMap={mergedNoteMap}
+                                overlayFilled={theorySettings.overlayFilled}
                                 strings={strings}
                                 tuning={tuning}
                                 tuningIndex={tuningIndex}
@@ -1527,13 +1707,9 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
                 <MobileFretboardSettings
                     isOpen={mobileSettingsOpen}
                     onClose={() => setMobileSettingsOpen(false)}
-                    canAddLayer={normalizedLayerConfigs.length < SLOT_ORDER.length}
-                    layerConfigs={normalizedLayerConfigs}
+                    theorySettings={theorySettings}
+                    onTheoryChange={setTheorySettings}
                     noteDisplayMode={noteDisplayMode}
-                    onAddLayer={addLayer}
-                    onRemoveLayer={removeLayer}
-                    onLayerColorChange={(slot, color) => updateLayerConfig(slot, "color", color)}
-                    onLayerKindChange={(slot, kind) => updateLayerConfig(slot, "kind", kind)}
                     onToggleNoteDisplayMode={() =>
                         setNoteDisplayMode((currentMode) =>
                             currentMode === "notes" ? "intervals" : "notes"
@@ -1561,6 +1737,8 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
                     setChordDisplayColor={setChordDisplayColor}
                 />
             </div>
+
+            <OnboardingTour active={tourActive} onRequestPlay={handleTourRequestPlay} />
         </div>
     );
 }
