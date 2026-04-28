@@ -2,12 +2,13 @@
 
 import { useRouter } from "next/navigation";
 import {
-    PRESET_DEFINITIONS,
     BLANK_THEORY,
-    applyTheoryPreset,
+    LAYER_GROUPS,
     type TheorySettings,
-    type TheoryPreset,
+    type LayerKind,
 } from "@/lib/layers";
+
+type ChordLabelMode = "off" | "roman" | "number" | "theory";
 
 type PanelColors = {
     border: string;
@@ -35,6 +36,8 @@ type LeftMenuPanelProps = {
     songName: string;
     songId: string;
     onStartTour: () => void;
+    chordLabelMode: ChordLabelMode;
+    onChordLabelModeChange: (mode: ChordLabelMode) => void;
 };
 
 export default function LeftMenuPanel({
@@ -47,6 +50,8 @@ export default function LeftMenuPanel({
     songName,
     songId,
     onStartTour,
+    chordLabelMode,
+    onChordLabelModeChange,
 }: LeftMenuPanelProps) {
     const router = useRouter();
 
@@ -174,46 +179,30 @@ export default function LeftMenuPanel({
                         {/* Theory Overlay */}
                         <div>
                             <div className="mb-2.5 text-[10px] font-semibold uppercase tracking-[0.24em]" style={{ fontFamily: "'Rajdhani', sans-serif", color: p.label }}>
-                                Theory Overlay
+                                Theory Layers
                             </div>
 
-                            {/* Current preset indicator */}
-                            <div className="mb-2 px-3 py-2 rounded-lg text-[11px]" style={{ background: p.rowHover, border: `1px solid ${p.rowBorder}` }}>
-                                <span className="text-[9px] uppercase tracking-[0.16em]" style={{ fontFamily: "'Rajdhani', sans-serif", color: p.label }}>Active — </span>
-                                <span className="font-bold" style={{ fontFamily: "'Rajdhani', sans-serif", color: p.text }}>
-                                    {PRESET_DEFINITIONS.find(d => d.id === theorySettings.preset)?.label ?? "Custom"}
-                                </span>
-                            </div>
-
-                            {/* Preset quick-select */}
-                            <div className="flex flex-col gap-1">
-                                {PRESET_DEFINITIONS.map((def) => {
-                                    const isActive = theorySettings.preset === def.id;
+                            {/* Active layers summary */}
+                            <div className="mb-2 flex flex-col gap-1">
+                                {([
+                                    ["Layer One", theorySettings.layer1Kind],
+                                    ["Layer Two", theorySettings.layer2Kind],
+                                    ["Layer Three", theorySettings.layer3Kind],
+                                ] as [string, LayerKind | null][]).map(([rowLabel, kind]) => {
+                                    const kindLabel = kind
+                                        ? LAYER_GROUPS.flatMap(g => g.options).find(o => o.value === kind)?.label ?? kind
+                                        : null;
                                     return (
-                                        <button
-                                            key={def.id}
-                                            type="button"
-                                            onClick={() => onTheoryChange(applyTheoryPreset(def.id as TheoryPreset, theorySettings))}
-                                            className="flex items-center justify-between rounded-lg px-3 py-2 text-left transition-all"
-                                            style={{
-                                                border: `1px solid ${isActive ? p.text : p.rowBorder}`,
-                                                background: isActive ? p.activeBg : "transparent",
-                                            }}
-                                            onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = p.rowHover; }}
-                                            onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = "transparent"; }}
+                                        <div
+                                            key={rowLabel}
+                                            className="flex items-center justify-between rounded-lg px-3 py-2"
+                                            style={{ background: p.rowHover, border: `1px solid ${p.rowBorder}` }}
                                         >
-                                            <span
-                                                className="text-[12px] font-semibold"
-                                                style={{ fontFamily: "'Rajdhani', sans-serif", color: isActive ? p.activeText : p.text }}
-                                            >
-                                                {def.label}
+                                            <span className="text-[9px] uppercase tracking-[0.14em]" style={{ fontFamily: "'Rajdhani', sans-serif", color: p.label }}>{rowLabel}</span>
+                                            <span className="text-[11px] font-semibold" style={{ fontFamily: "'Rajdhani', sans-serif", color: kindLabel ? p.text : p.inactiveText }}>
+                                                {kindLabel ?? "—"}
                                             </span>
-                                            {isActive && (
-                                                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ color: p.activeText, flexShrink: 0 }}>
-                                                    <polyline points="20 6 9 17 4 12" />
-                                                </svg>
-                                            )}
-                                        </button>
+                                        </div>
                                     );
                                 })}
                             </div>
@@ -231,6 +220,48 @@ export default function LeftMenuPanel({
                             >
                                 Reset Layers
                             </button>
+                        </div>
+
+                        {/* Divider */}
+                        <div style={{ height: 1, background: p.divider }} />
+
+                        {/* Chord Labels */}
+                        <div>
+                            <div className="mb-2.5 text-[10px] font-semibold uppercase tracking-[0.24em]" style={{ fontFamily: "'Rajdhani', sans-serif", color: p.label }}>
+                                Chord Labels
+                            </div>
+                            <div className="grid grid-cols-4 gap-1">
+                                {([
+                                    { value: "roman",  display: "V" },
+                                    { value: "number", display: "5" },
+                                    { value: "theory", display: "Tonic" },
+                                    { value: "off",    display: "Off" },
+                                ] as { value: ChordLabelMode; display: string }[]).map(({ value, display }) => {
+                                    const active = chordLabelMode === value;
+                                    return (
+                                        <button
+                                            key={value}
+                                            type="button"
+                                            onClick={() => onChordLabelModeChange(value)}
+                                            className="rounded-lg py-2 text-[10px] font-semibold uppercase tracking-[0.1em] transition-colors"
+                                            style={{
+                                                fontFamily: "'Rajdhani', sans-serif",
+                                                background: active ? p.activeBg : "transparent",
+                                                color: active ? p.activeText : p.inactiveText,
+                                                border: `1px solid ${active ? p.toggleBorder : p.rowBorder}`,
+                                            }}
+                                        >
+                                            {display}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                            <div className="mt-2 text-[9px] leading-snug" style={{ fontFamily: "'Rajdhani', sans-serif", color: p.inactiveText, opacity: 0.7 }}>
+                                {chordLabelMode === "roman" && "Roman numerals (I, ii, V…)"}
+                                {chordLabelMode === "number" && "Scale degree numbers (1, 2, 5…)"}
+                                {chordLabelMode === "theory" && "Function names (Tonic, Dominant…)"}
+                                {chordLabelMode === "off" && "No label shown under chords"}
+                            </div>
                         </div>
 
                     </div>

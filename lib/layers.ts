@@ -13,22 +13,19 @@ export type LayerKind =
     | "chord-tones"
     | "interval";
 
-export type BaseLayerKind = "off" | "song-key" | "key-pentatonic" | "chord-pentatonic" | "chord-scale";
-export type OverlayKind = "root-notes" | "triads" | "chord-tones" | "interval";
-export type TheoryPreset = "song-view" | "target-notes" | "pentatonic-solo" | "chord-only";
 export type LayerRole = "base" | "overlay" | "overlay2";
 
 export type TheorySettings = {
-    preset: TheoryPreset | "custom";
-    baseKind: BaseLayerKind;
-    baseColor: string;
-    overlayKind: OverlayKind | null;
-    overlayColor: string;
-    overlayInterval: number | null;
-    overlayFilled: boolean;
-    overlay2Kind: OverlayKind | null;
-    overlay2Color: string;
-    overlay2Interval: number | null;
+    layer1Kind: LayerKind | null;
+    layer1Color: string;
+    layer1Interval: number | null;
+    layer2Kind: LayerKind | null;
+    layer2Color: string;
+    layer2Interval: number | null;
+    layer2Filled: boolean;
+    layer3Kind: LayerKind | null;
+    layer3Color: string;
+    layer3Interval: number | null;
 };
 
 export type LayerConfig = {
@@ -58,85 +55,61 @@ export type Layer = {
 };
 
 export const BLANK_THEORY: TheorySettings = {
-    preset: "custom",
-    baseKind: "off",
-    baseColor: "#3b82f6",
-    overlayKind: null,
-    overlayColor: "#22c55e",
-    overlayInterval: null,
-    overlayFilled: false,
-    overlay2Kind: null,
-    overlay2Color: "#f59e0b",
-    overlay2Interval: null,
+    layer1Kind: null,
+    layer1Color: "#3b82f6",
+    layer1Interval: null,
+    layer2Kind: null,
+    layer2Color: "#22c55e",
+    layer2Interval: null,
+    layer2Filled: false,
+    layer3Kind: null,
+    layer3Color: "#f59e0b",
+    layer3Interval: null,
 };
 
 export const DEFAULT_THEORY: TheorySettings = {
-    preset: "pentatonic-solo",
-    baseKind: "key-pentatonic",
-    baseColor: "#3b82f6",
-    overlayKind: "chord-tones",
-    overlayColor: "#22c55e",
-    overlayInterval: null,
-    overlayFilled: false,
-    overlay2Kind: null,
-    overlay2Color: "#f59e0b",
-    overlay2Interval: null,
+    layer1Kind: "key-pentatonic",
+    layer1Color: "#3b82f6",
+    layer1Interval: null,
+    layer2Kind: "chord-tones",
+    layer2Color: "#22c55e",
+    layer2Interval: null,
+    layer2Filled: false,
+    layer3Kind: null,
+    layer3Color: "#f59e0b",
+    layer3Interval: null,
 };
 
-export const PRESET_DEFINITIONS: {
-    id: TheoryPreset;
+export const BASE_KIND_VALUES: ReadonlyArray<LayerKind> = [
+    "song-key", "chord-pentatonic", "key-pentatonic", "chord-scale",
+];
+
+export function isBaseKind(kind: LayerKind | null): boolean {
+    return kind !== null && (BASE_KIND_VALUES as readonly LayerKind[]).includes(kind);
+}
+
+export const LAYER_GROUPS: ReadonlyArray<{
     label: string;
-    description: string;
-    baseKind: BaseLayerKind;
-    overlayKind: OverlayKind | null;
-    overlay2Kind: OverlayKind | null;
-}[] = [
+    options: ReadonlyArray<{ value: LayerKind; label: string }>;
+}> = [
     {
-        id: "song-view",
-        label: "Song View",
-        description: "Shows the full diatonic scale of the song key. No overlays — just the key map.",
-        baseKind: "song-key",
-        overlayKind: null,
-        overlay2Kind: null,
+        label: "BASE LAYERS",
+        options: [
+            { value: "song-key",         label: "Diatonic Scale" },
+            { value: "chord-pentatonic", label: "Chord Pentatonics" },
+            { value: "key-pentatonic",   label: "Key Pentatonic" },
+            { value: "chord-scale",      label: "Chord Scale" },
+        ],
     },
     {
-        id: "target-notes",
-        label: "Target Notes",
-        description: "Stay in the key, target the chord. Shows the full scale with chord tones ringed as you play.",
-        baseKind: "song-key",
-        overlayKind: "chord-tones",
-        overlay2Kind: null,
+        label: "OVERLAYS",
+        options: [
+            { value: "chord-tones", label: "Chord Tones" },
+            { value: "triads",      label: "Triads" },
+            { value: "root-notes",  label: "Root Notes" },
+            { value: "interval",    label: "Interval..." },
+        ],
     },
-    {
-        id: "pentatonic-solo",
-        label: "Pentatonic Solo",
-        description: "Key pentatonic shapes (static) with chord tones ringed. Best for soloing over changes.",
-        baseKind: "key-pentatonic",
-        overlayKind: "chord-tones",
-        overlay2Kind: null,
-    },
-    {
-        id: "chord-only",
-        label: "Chord Only",
-        description: "Chord tones ringed over the key scale, with root notes accented. Designed for arpeggios.",
-        baseKind: "song-key",
-        overlayKind: "chord-tones",
-        overlay2Kind: "root-notes",
-    },
-];
-
-export const BASE_LAYER_OPTIONS: { value: BaseLayerKind; label: string }[] = [
-    { value: "song-key",        label: "Song Key" },
-    { value: "key-pentatonic",  label: "Key Pentatonic" },
-    { value: "chord-pentatonic", label: "Chord Pentatonic" },
-    { value: "chord-scale",     label: "Chord Scale" },
-];
-
-export const OVERLAY_OPTIONS: { value: OverlayKind; label: string }[] = [
-    { value: "chord-tones", label: "Chord Tones" },
-    { value: "triads",      label: "Triads" },
-    { value: "root-notes",  label: "Root Notes" },
-    { value: "interval",    label: "Interval..." },
 ];
 
 export const INTERVAL_OPTIONS: { semitones: number; label: string }[] = [
@@ -332,52 +305,43 @@ function getTriadNotes(chordName: string): number[] {
 export function theorySettingsToLayerConfigs(settings: TheorySettings): LayerConfig[] {
     const configs: LayerConfig[] = [];
 
-    if (settings.overlay2Kind) {
+    if (settings.layer3Kind) {
         configs.push({
             slot: "primary",
             role: "overlay2",
-            kind: settings.overlay2Kind,
-            color: settings.overlay2Color,
-            ...(settings.overlay2Kind === "interval" && settings.overlay2Interval !== null
-                ? { interval: settings.overlay2Interval }
+            kind: settings.layer3Kind,
+            color: settings.layer3Color,
+            ...(settings.layer3Kind === "interval" && settings.layer3Interval !== null
+                ? { interval: settings.layer3Interval }
                 : {}),
         });
     }
 
-    if (settings.overlayKind) {
+    if (settings.layer2Kind) {
         configs.push({
             slot: "secondary",
             role: "overlay",
-            kind: settings.overlayKind,
-            color: settings.overlayColor,
-            ...(settings.overlayKind === "interval" && settings.overlayInterval !== null
-                ? { interval: settings.overlayInterval }
+            kind: settings.layer2Kind,
+            color: settings.layer2Color,
+            ...(settings.layer2Kind === "interval" && settings.layer2Interval !== null
+                ? { interval: settings.layer2Interval }
                 : {}),
         });
     }
 
-    if (settings.baseKind !== "off") configs.push({
-        slot: "tertiary",
-        role: "base",
-        kind: settings.baseKind,
-        color: settings.baseColor,
-    });
+    if (settings.layer1Kind) {
+        configs.push({
+            slot: "tertiary",
+            role: "base",
+            kind: settings.layer1Kind,
+            color: settings.layer1Color,
+            ...(settings.layer1Kind === "interval" && settings.layer1Interval !== null
+                ? { interval: settings.layer1Interval }
+                : {}),
+        });
+    }
 
     return configs;
-}
-
-export function applyTheoryPreset(preset: TheoryPreset, current: TheorySettings): TheorySettings {
-    const def = PRESET_DEFINITIONS.find((p) => p.id === preset);
-    if (!def) return current;
-    return {
-        ...current,
-        preset,
-        baseKind: def.baseKind,
-        overlayKind: def.overlayKind,
-        overlay2Kind: def.overlay2Kind,
-        overlayInterval: null,
-        overlay2Interval: null,
-    };
 }
 
 export function buildLayer(config: LayerConfig, context: LayerContext): Layer | null {

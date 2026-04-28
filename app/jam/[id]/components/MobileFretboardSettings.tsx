@@ -1,17 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import {
-    PRESET_DEFINITIONS,
-    BASE_LAYER_OPTIONS,
-    OVERLAY_OPTIONS,
+    LAYER_GROUPS,
     INTERVAL_OPTIONS,
-    applyTheoryPreset,
+    isBaseKind,
     type TheorySettings,
-    type TheoryPreset,
-    type OverlayKind,
-    type BaseLayerKind,
+    type LayerKind,
 } from "@/lib/layers";
 import ColorWheelPicker from "./ColorWheelPicker";
 
@@ -46,6 +42,7 @@ type Props = {
     setNoteTextColor: (m: TextColorMode) => void;
     setPlayheadColor: (c: string) => void;
     setChordDisplayColor: (c: string) => void;
+    onResetToDefault: () => void;
 };
 
 function SectionHeader({ label, open, onToggle }: { label: string; open: boolean; onToggle: () => void }) {
@@ -120,27 +117,128 @@ function IntervalPicker({ value, onChange }: { value: number | null; onChange: (
     );
 }
 
-// ─── Overlay row ─────────────────────────────────────────────────────────────
+// ─── Layer kind picker ────────────────────────────────────────────────────────
 
-function OverlayRow({
+function layerKindLabel(kind: LayerKind | null): string {
+    if (!kind) return "(None)";
+    for (const group of LAYER_GROUPS) {
+        for (const opt of group.options) {
+            if (opt.value === kind) return opt.label;
+        }
+    }
+    return kind;
+}
+
+function LayerKindPicker({
+    value,
+    baseLayerTaken,
+    onChange,
+}: {
+    value: LayerKind | null;
+    baseLayerTaken: boolean;
+    onChange: (k: LayerKind | null) => void;
+}) {
+    const [open, setOpen] = useState(false);
+    const containerRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        if (!open) return;
+        const handler = (e: MouseEvent) => {
+            if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+                setOpen(false);
+            }
+        };
+        document.addEventListener("mousedown", handler);
+        return () => document.removeEventListener("mousedown", handler);
+    }, [open]);
+
+    return (
+        <div ref={containerRef} className="relative min-w-0 flex-1">
+            <button
+                type="button"
+                onClick={() => setOpen((o) => !o)}
+                className="flex w-full items-center justify-between rounded border border-white/10 bg-[#111118] px-2 py-1.5 text-left text-[12px] text-white transition hover:border-white/25"
+            >
+                <span className="truncate">{layerKindLabel(value)}</span>
+                <svg className="ml-1 shrink-0 opacity-40" width="10" height="10" viewBox="0 0 10 10" fill="currentColor">
+                    <path d="M1 3l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" fill="none" />
+                </svg>
+            </button>
+
+            {open && (
+                <div className="absolute left-0 top-[calc(100%+4px)] z-[60] w-[200px] overflow-hidden rounded-xl border border-white/12 bg-[#13131e] py-1 shadow-[0_12px_40px_rgba(0,0,0,0.5)]">
+                    {LAYER_GROUPS.map((group) => (
+                        <div key={group.label}>
+                            <div className="px-3 pt-2.5 pb-1 text-[9px] font-bold uppercase tracking-[0.22em] text-white/35">
+                                {group.label}
+                            </div>
+                            {group.options.map((opt) => {
+                                const disabled = group.label === "BASE LAYERS" && baseLayerTaken && opt.value !== value;
+                                const active = value === opt.value;
+                                return (
+                                    <button
+                                        key={opt.value}
+                                        type="button"
+                                        disabled={disabled}
+                                        onClick={() => {
+                                            if (!disabled) { onChange(opt.value); setOpen(false); }
+                                        }}
+                                        className={`w-full px-3 py-1.5 text-left text-[12px] transition ${
+                                            active
+                                                ? "bg-white/15 text-white font-semibold"
+                                                : disabled
+                                                    ? "cursor-not-allowed text-white/20"
+                                                    : "text-white/75 hover:bg-white/8 hover:text-white"
+                                        }`}
+                                    >
+                                        {opt.label}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    ))}
+                    <div className="mt-1 border-t border-white/8 pt-1">
+                        <button
+                            type="button"
+                            onClick={() => { onChange(null); setOpen(false); }}
+                            className={`w-full px-3 py-1.5 text-left text-[12px] transition ${
+                                value === null
+                                    ? "bg-white/15 text-white font-semibold"
+                                    : "text-white/50 hover:bg-white/8 hover:text-white/80"
+                            }`}
+                        >
+                            (None)
+                        </button>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}
+
+// ─── Layer row ────────────────────────────────────────────────────────────────
+
+function LayerRow({
     label,
     kind,
     color,
     interval,
+    baseLayerTaken,
     showFlipButton,
-    overlayFilled,
+    layerFilled,
     onKindChange,
     onColorChange,
     onIntervalChange,
     onToggleFlip,
 }: {
     label: string;
-    kind: OverlayKind | null;
+    kind: LayerKind | null;
     color: string;
     interval: number | null;
+    baseLayerTaken: boolean;
     showFlipButton?: boolean;
-    overlayFilled?: boolean;
-    onKindChange: (k: OverlayKind | null) => void;
+    layerFilled?: boolean;
+    onKindChange: (k: LayerKind | null) => void;
     onColorChange: (c: string) => void;
     onIntervalChange: (n: number) => void;
     onToggleFlip?: () => void;
@@ -154,29 +252,17 @@ function OverlayRow({
                         type="button"
                         onClick={onToggleFlip}
                         className={`rounded px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide transition ${
-                            overlayFilled
+                            layerFilled
                                 ? "bg-white/20 text-white"
                                 : "bg-white/6 text-white/40 hover:bg-white/12 hover:text-white/70"
                         }`}
                     >
-                        {overlayFilled ? "Fill ●" : "Ring ○"}
+                        {layerFilled ? "Fill ●" : "Ring ○"}
                     </button>
                 )}
             </div>
             <div className="flex items-center gap-2">
-                <select
-                    value={kind ?? "none"}
-                    onChange={(e) => {
-                        const val = e.target.value;
-                        onKindChange(val === "none" ? null : (val as OverlayKind));
-                    }}
-                    className="min-w-0 flex-1 rounded border border-white/10 bg-[#111118] px-2 py-1.5 text-[12px] text-white outline-none"
-                >
-                    <option value="none">None</option>
-                    {OVERLAY_OPTIONS.map((opt) => (
-                        <option key={opt.value} value={opt.value}>{opt.label}</option>
-                    ))}
-                </select>
+                <LayerKindPicker value={kind} baseLayerTaken={baseLayerTaken} onChange={onKindChange} />
                 <ColorWheelPicker value={color} onChange={onColorChange} />
             </div>
             {kind === "interval" && <IntervalPicker value={interval} onChange={onIntervalChange} />}
@@ -193,87 +279,47 @@ function TheorySection({
     settings: TheorySettings;
     onChange: (s: TheorySettings) => void;
 }) {
-    const [customOpen, setCustomOpen] = useState(false);
-    const update = (patch: Partial<TheorySettings>) => onChange({ ...settings, ...patch, preset: "custom" });
+    const update = (patch: Partial<TheorySettings>) => onChange({ ...settings, ...patch });
+
+    const base1Taken = isBaseKind(settings.layer2Kind) || isBaseKind(settings.layer3Kind);
+    const base2Taken = isBaseKind(settings.layer1Kind) || isBaseKind(settings.layer3Kind);
+    const base3Taken = isBaseKind(settings.layer1Kind) || isBaseKind(settings.layer2Kind);
 
     return (
-        <div className="space-y-3">
-            {/* Presets */}
-            <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-white/40" style={{ fontFamily: "'Rajdhani', sans-serif" }}>
-                Presets
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-                {PRESET_DEFINITIONS.map((preset) => (
-                    <button
-                        key={preset.id}
-                        type="button"
-                        onClick={() => onChange(applyTheoryPreset(preset.id, settings))}
-                        className={`rounded-lg border px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-[0.1em] transition ${
-                            settings.preset === preset.id
-                                ? "border-white bg-white text-black"
-                                : "border-white/15 bg-black/40 text-white/75 hover:border-white/35 hover:text-white"
-                        }`}
-                    >
-                        {preset.label}
-                    </button>
-                ))}
-            </div>
-
-            {/* Custom layers toggle */}
-            <button
-                type="button"
-                onClick={() => setCustomOpen((o) => !o)}
-                className="flex w-full items-center justify-between rounded-lg border border-white/10 bg-white/5 px-4 py-2.5 text-left transition hover:bg-white/8"
-            >
-                <span className="text-[12px] font-semibold uppercase tracking-[0.14em] text-white/70" style={{ fontFamily: "'Rajdhani', sans-serif" }}>
-                    Custom Layers
-                </span>
-                <span className="text-white/50">{customOpen ? "−" : "+"}</span>
-            </button>
-
-            {customOpen && (
-                <div className="space-y-2">
-                    {/* Base layer */}
-                    <div className="rounded-lg border border-white/10 bg-black/40 px-3 py-2.5">
-                        <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-white/45">Base Layer</div>
-                        <div className="flex items-center gap-2">
-                            <select
-                                value={settings.baseKind}
-                                onChange={(e) => update({ baseKind: e.target.value as BaseLayerKind })}
-                                className="min-w-0 flex-1 rounded border border-white/10 bg-[#111118] px-2 py-1.5 text-[12px] text-white outline-none"
-                            >
-                                {BASE_LAYER_OPTIONS.map((opt) => (
-                                    <option key={opt.value} value={opt.value}>{opt.label}</option>
-                                ))}
-                            </select>
-                            <ColorWheelPicker value={settings.baseColor} onChange={(c) => update({ baseColor: c })} />
-                        </div>
-                    </div>
-
-                    <OverlayRow
-                        label="Overlay"
-                        kind={settings.overlayKind}
-                        color={settings.overlayColor}
-                        interval={settings.overlayInterval}
-                        showFlipButton
-                        overlayFilled={settings.overlayFilled}
-                        onKindChange={(k) => update({ overlayKind: k, overlayInterval: null })}
-                        onColorChange={(c) => update({ overlayColor: c })}
-                        onIntervalChange={(n) => update({ overlayInterval: n })}
-                        onToggleFlip={() => onChange({ ...settings, overlayFilled: !settings.overlayFilled })}
-                    />
-
-                    <OverlayRow
-                        label="Additional Overlay"
-                        kind={settings.overlay2Kind}
-                        color={settings.overlay2Color}
-                        interval={settings.overlay2Interval}
-                        onKindChange={(k) => update({ overlay2Kind: k, overlay2Interval: null })}
-                        onColorChange={(c) => update({ overlay2Color: c })}
-                        onIntervalChange={(n) => update({ overlay2Interval: n })}
-                    />
-                </div>
-            )}
+        <div className="space-y-2">
+            <LayerRow
+                label="Layer One"
+                kind={settings.layer1Kind}
+                color={settings.layer1Color}
+                interval={settings.layer1Interval}
+                baseLayerTaken={base1Taken}
+                onKindChange={(k) => update({ layer1Kind: k, layer1Interval: null })}
+                onColorChange={(c) => update({ layer1Color: c })}
+                onIntervalChange={(n) => update({ layer1Interval: n })}
+            />
+            <LayerRow
+                label="Layer Two"
+                kind={settings.layer2Kind}
+                color={settings.layer2Color}
+                interval={settings.layer2Interval}
+                baseLayerTaken={base2Taken}
+                showFlipButton
+                layerFilled={settings.layer2Filled}
+                onKindChange={(k) => update({ layer2Kind: k, layer2Interval: null })}
+                onColorChange={(c) => update({ layer2Color: c })}
+                onIntervalChange={(n) => update({ layer2Interval: n })}
+                onToggleFlip={() => onChange({ ...settings, layer2Filled: !settings.layer2Filled })}
+            />
+            <LayerRow
+                label="Layer Three"
+                kind={settings.layer3Kind}
+                color={settings.layer3Color}
+                interval={settings.layer3Interval}
+                baseLayerTaken={base3Taken}
+                onKindChange={(k) => update({ layer3Kind: k, layer3Interval: null })}
+                onColorChange={(c) => update({ layer3Color: c })}
+                onIntervalChange={(n) => update({ layer3Interval: n })}
+            />
         </div>
     );
 }
@@ -307,6 +353,7 @@ export default function MobileFretboardSettings({
     setNoteTextColor,
     setPlayheadColor,
     setChordDisplayColor,
+    onResetToDefault,
 }: Props) {
     const router = useRouter();
     const [openSection, setOpenSection] = useState<"none" | "theory" | "color" | "display">("none");
@@ -422,6 +469,20 @@ export default function MobileFretboardSettings({
                             <div>
                                 <div className="mb-2 text-[10px] uppercase tracking-[0.18em] text-white/40" style={{ fontFamily: "'Rajdhani', sans-serif" }}>Playback Bar</div>
                                 <ColorRow label="Bar Color" value={playheadColor} onChange={setPlayheadColor} />
+                            </div>
+                            <div className="pt-1 border-t border-white/10">
+                                <button
+                                    type="button"
+                                    onClick={onResetToDefault}
+                                    className="w-full rounded-lg px-3 py-2.5 text-[11px] font-semibold uppercase tracking-[0.12em] transition-opacity hover:opacity-70"
+                                    style={{
+                                        fontFamily: "'Rajdhani', sans-serif",
+                                        color: "rgba(255,255,255,0.4)",
+                                        border: "1px dashed rgba(255,255,255,0.2)",
+                                    }}
+                                >
+                                    Reset to Default
+                                </button>
                             </div>
                         </div>
                     )}

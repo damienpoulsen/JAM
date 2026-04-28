@@ -73,7 +73,7 @@ export default function PlaybackControls({
                                 type="button"
                                 onContextMenu={onNameContextMenu}
                                 className="block w-full cursor-pointer truncate select-none text-left"
-                                title={songName}
+                                title="Right-click to rename"
                                 style={{ fontFamily: "'Rajdhani', sans-serif", letterSpacing: "0.03em" }}
                             >
                                 {songName}
@@ -90,8 +90,7 @@ export default function PlaybackControls({
                         )}
                     </div>
 
-                    <div className="flex flex-1 justify-center gap-12 text-3xl">
-                        <button type="button">⏮</button>
+                    <div className="flex flex-1 justify-center text-3xl">
                         <button
                             type="button"
                             onClick={onTogglePlay}
@@ -100,7 +99,6 @@ export default function PlaybackControls({
                         >
                             {isPlaying ? "⏸" : "▶"}
                         </button>
-                        <button type="button">⏭</button>
                     </div>
 
                     <div className="relative flex w-[200px] shrink-0 justify-end">

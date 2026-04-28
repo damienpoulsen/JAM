@@ -12,7 +12,67 @@ import {
 } from "../../../../lib/analysis";
 import { readSongs, type Song, writeSongs } from "../../../../lib/songs";
 
+type ProgressPhase = { label: string; targetPct: number; durationMs: number };
+
+const PHASES_HPSS: ProgressPhase[] = [
+  { label: "Loading audio",        targetPct: 10, durationMs: 2000  },
+  { label: "Separating harmonics", targetPct: 38, durationMs: 8000  },
+  { label: "Detecting chords",     targetPct: 68, durationMs: 12000 },
+  { label: "Analyzing rhythm",     targetPct: 88, durationMs: 6000  },
+  { label: "Finalizing",           targetPct: 92, durationMs: 3000  },
+];
+
+const PHASES_DEMUCS: ProgressPhase[] = [
+  { label: "Loading audio",        targetPct:  3, durationMs:  3000 },
+  { label: "Loading stem model",   targetPct: 18, durationMs: 15000 },
+  { label: "Separating stems",     targetPct: 55, durationMs: 80000 },
+  { label: "Detecting chords",     targetPct: 75, durationMs: 30000 },
+  { label: "Analyzing rhythm",     targetPct: 88, durationMs: 15000 },
+  { label: "Finalizing",           targetPct: 92, durationMs: 10000 },
+];
+
 const PUBLIC_ANALYSIS_API_URL = process.env.NEXT_PUBLIC_ANALYSIS_API_URL?.replace(/\/$/, "") ?? "";
+
+function audioBufferToWav(buffer: AudioBuffer): ArrayBuffer {
+  const numChannels = 1;
+  const sampleRate = buffer.sampleRate;
+  const samples = buffer.getChannelData(0);
+  const dataLen = samples.length * 2;
+  const arrayBuffer = new ArrayBuffer(44 + dataLen);
+  const view = new DataView(arrayBuffer);
+  const writeStr = (off: number, str: string) => { for (let i = 0; i < str.length; i++) view.setUint8(off + i, str.charCodeAt(i)); };
+  writeStr(0, "RIFF");
+  view.setUint32(4, 36 + dataLen, true);
+  writeStr(8, "WAVE");
+  writeStr(12, "fmt ");
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);
+  view.setUint16(22, numChannels, true);
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * 2, true);
+  view.setUint16(32, 2, true);
+  view.setUint16(34, 16, true);
+  writeStr(36, "data");
+  view.setUint32(40, dataLen, true);
+  let offset = 44;
+  for (let i = 0; i < samples.length; i++) {
+    const s = Math.max(-1, Math.min(1, samples[i]));
+    view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7fff, true);
+    offset += 2;
+  }
+  return arrayBuffer;
+}
+
+async function extractAudioAsWav(videoFile: File): Promise<File> {
+  const ctx = new AudioContext({ sampleRate: 22050 });
+  try {
+    const buf = await ctx.decodeAudioData(await videoFile.arrayBuffer());
+    const wav = audioBufferToWav(buf);
+    return new File([wav], videoFile.name.replace(/\.[^.]+$/, ".wav"), { type: "audio/wav" });
+  } finally {
+    await ctx.close();
+  }
+}
 
 function updateStoredSong(songId: string, patch: Partial<Song>) {
   const songs = readSongs();
@@ -31,10 +91,13 @@ export default function PrepareJamPage({ params }: { params: Promise<{ id: strin
   const { id } = use(params);
   const router = useRouter();
   const hasAnalyzedRef = useRef(false);
+  const progressTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [songName, setSongName] = useState("Preparing track");
   const [errorMessage, setErrorMessage] = useState("");
   const [phase, setPhase] = useState<Phase>("checking");
   const [stemMode, setStemMode] = useState<StemMode>("demucs");
+  const [progress, setProgress] = useState(0);
+  const [phaseLabel, setPhaseLabel] = useState("Loading…");
 
   // Phase 1: check cache / song existence — runs once on mount
   useEffect(() => {
@@ -90,8 +153,12 @@ export default function PrepareJamPage({ params }: { params: Promise<{ id: strin
       updateStoredSong(id, { analysisStatus: "loading" });
 
       try {
-        const file = await getFile(song.fileId);
-        if (!file) throw new Error("Audio file is unavailable for this track.");
+        const rawFile = await getFile(song.fileId);
+        if (!rawFile) throw new Error("Audio file is unavailable for this track.");
+
+        const file = rawFile.type.startsWith("video/")
+          ? await extractAudioAsWav(rawFile)
+          : rawFile;
 
         const formData = new FormData();
         formData.append("songId", id);
@@ -124,8 +191,17 @@ export default function PrepareJamPage({ params }: { params: Promise<{ id: strin
           analysisStatus: "ready",
         });
 
+        if (progressTimerRef.current) {
+          clearInterval(progressTimerRef.current);
+          progressTimerRef.current = null;
+        }
+        setProgress(100);
         router.replace(`/jam/${id}`);
       } catch (error) {
+        if (progressTimerRef.current) {
+          clearInterval(progressTimerRef.current);
+          progressTimerRef.current = null;
+        }
         updateStoredSong(id, { analysisStatus: "error" });
         setErrorMessage(error instanceof Error ? error.message : "Failed to load this track.");
       }
@@ -133,6 +209,55 @@ export default function PrepareJamPage({ params }: { params: Promise<{ id: strin
 
     void runAnalysis();
   }, [id, router, phase, stemMode]);
+
+  // Animate progress bar through known pipeline phases
+  useEffect(() => {
+    if (phase !== "analyzing") {
+      setProgress(0);
+      return;
+    }
+
+    const phases = stemMode === "demucs" ? PHASES_DEMUCS : PHASES_HPSS;
+    const startTime = Date.now();
+
+    const tick = () => {
+      const elapsed = Date.now() - startTime;
+      let cumTime = 0;
+      let pct = 0;
+      let label = phases[0].label;
+
+      for (let i = 0; i < phases.length; i++) {
+        const prevPct = i === 0 ? 0 : phases[i - 1].targetPct;
+        const dur = phases[i].durationMs;
+        const phaseEnd = cumTime + dur;
+
+        if (elapsed < phaseEnd) {
+          const t = (elapsed - cumTime) / dur;
+          const eased = 1 - Math.pow(1 - t, 2); // ease-out quad
+          pct = prevPct + (phases[i].targetPct - prevPct) * eased;
+          label = phases[i].label;
+          break;
+        }
+
+        cumTime = phaseEnd;
+        pct = phases[i].targetPct;
+        label = phases[i].label;
+      }
+
+      setProgress(Math.min(pct, 92));
+      setPhaseLabel(label);
+    };
+
+    tick();
+    progressTimerRef.current = setInterval(tick, 150);
+
+    return () => {
+      if (progressTimerRef.current) {
+        clearInterval(progressTimerRef.current);
+        progressTimerRef.current = null;
+      }
+    };
+  }, [phase, stemMode]);
 
   const startAnalysis = (mode: StemMode) => {
     setStemMode(mode);
@@ -149,15 +274,7 @@ export default function PrepareJamPage({ params }: { params: Promise<{ id: strin
   return (
     <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;0,800;0,900;1,400;1,700&family=Lora:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Courier+Prime:ital,wght@0,400;0,700;1,400&display=swap');
-
-        .bar-pulse {
-          animation: bar-pulse 1.8s ease-in-out infinite;
-        }
-        @keyframes bar-pulse {
-          0%,100% { opacity: 1; width: 40%; }
-          50%      { opacity: 0.6; width: 70%; }
-        }
+        @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Lora:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Courier+Prime:ital,wght@0,400;0,700;1,400&display=swap');
 
         .mode-card {
           transition: transform 0.18s, border-color 0.18s, box-shadow 0.18s, background 0.18s;
@@ -165,48 +282,75 @@ export default function PrepareJamPage({ params }: { params: Promise<{ id: strin
         }
         .mode-card:hover {
           transform: translateY(-3px);
+          border-color: rgba(160,100,255,0.7) !important;
+          box-shadow: 0 12px 40px rgba(0,0,0,0.55), 0 0 28px rgba(120,60,200,0.28) !important;
+        }
+
+        .action-btn {
+          transition: transform 0.18s, box-shadow 0.18s, border-color 0.18s;
+        }
+        .action-btn:hover {
+          transform: translateY(-2px);
+          border-color: rgba(160,80,255,1) !important;
+          box-shadow: 0 0 28px rgba(130,50,240,0.55), 0 0 55px rgba(130,50,240,0.25), 0 8px 24px rgba(0,0,0,0.5) !important;
         }
       `}</style>
 
       <main
-        className="relative flex h-screen overflow-hidden px-6 py-4 text-white"
-        style={{ fontFamily: "'Lora', serif", background: "#0a080f" }}
+        className="relative flex h-screen overflow-hidden text-white"
+        style={{ fontFamily: "'Lora', serif", background: "#070610" }}
       >
-        {/* ── Atmospheric background ── */}
+        {/* Atmospheric background — corner purple blooms */}
         <div className="pointer-events-none fixed inset-0 overflow-hidden">
-          <div className="orb-1 absolute rounded-full" style={{ width: 1000, height: 1000, top: -400, left: -350, background: "radial-gradient(circle, rgba(120,60,200,0.28) 0%, rgba(90,30,160,0.10) 45%, transparent 70%)", filter: "blur(90px)" }} />
-          <div className="orb-2 absolute rounded-full" style={{ width: 700, height: 700, bottom: -200, right: -180, background: "radial-gradient(circle, rgba(100,50,180,0.18) 0%, transparent 65%)", filter: "blur(80px)" }} />
-          <div className="absolute inset-0" style={{ background: "radial-gradient(ellipse at 30% 40%, transparent 30%, rgba(8,5,2,0.5) 75%, rgba(5,3,1,0.82) 100%)" }} />
-          <div className="absolute inset-0" style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")`, backgroundSize: "256px 256px", opacity: 0.18, mixBlendMode: "overlay" }} />
+          <div className="absolute" style={{ width: 1100, height: 620, top: -290, left: -430, background: "radial-gradient(ellipse at 36% 40%, rgba(142,28,255,0.88) 0%, rgba(112,20,235,0.52) 28%, rgba(88,15,200,0.24) 52%, transparent 70%)", filter: "blur(88px)", transform: "rotate(-25deg)" }} />
+          <div className="absolute" style={{ width: 680, height: 270, top: -110, left: -210, background: "radial-gradient(ellipse at 42% 50%, rgba(175,65,255,0.68) 0%, rgba(135,38,235,0.32) 45%, transparent 72%)", filter: "blur(58px)", transform: "rotate(-40deg)" }} />
+          <div className="absolute" style={{ width: 1100, height: 620, bottom: -290, right: -430, background: "radial-gradient(ellipse at 64% 60%, rgba(142,28,255,0.88) 0%, rgba(112,20,235,0.52) 28%, rgba(88,15,200,0.24) 52%, transparent 70%)", filter: "blur(88px)", transform: "rotate(-25deg)" }} />
+          <div className="absolute" style={{ width: 680, height: 270, bottom: -110, right: -210, background: "radial-gradient(ellipse at 58% 50%, rgba(175,65,255,0.68) 0%, rgba(135,38,235,0.32) 45%, transparent 72%)", filter: "blur(58px)", transform: "rotate(-40deg)" }} />
         </div>
 
+        {/* ← HOME — fixed top-right */}
+        <Link
+          href="/"
+          className="action-btn fixed flex items-center gap-2 rounded-lg px-5 py-2.5 z-50"
+          style={{
+            top: 28,
+            right: 32,
+            border: "1.5px solid rgba(130,60,220,0.65)",
+            boxShadow: "0 0 14px rgba(110,40,210,0.5), 0 0 28px rgba(110,40,210,0.25), 0 6px 20px rgba(0,0,0,0.5)",
+            background: "rgba(10,6,22,0.85)",
+            backdropFilter: "blur(10px)",
+            fontFamily: "'Courier Prime', monospace",
+            fontSize: 13,
+            fontWeight: 700,
+            letterSpacing: "0.1em",
+            color: "white",
+            textDecoration: "none",
+          }}
+        >
+          ← HOME
+        </Link>
+
         {/* ── Content ── */}
-        <div className="relative mx-auto flex w-full max-w-4xl flex-1 items-center justify-center">
+        <div className="relative mx-auto flex w-full max-w-2xl flex-1 items-center justify-center px-6">
 
           {phase === "choose" ? (
             /* ── Quality choice screen ── */
-            <div className="w-full max-w-2xl px-4 text-center">
-              {/* Logo */}
-              <div className="relative mx-auto mb-5 flex justify-center">
-                <svg viewBox="0 0 540 300" xmlns="http://www.w3.org/2000/svg" className="relative h-auto w-[180px]" aria-label="JAM">
-                  <defs>
-                    <filter id="p-jam-glow" x="-20%" y="-30%" width="140%" height="160%">
-                      <feGaussianBlur in="SourceGraphic" stdDeviation="12" result="blur" />
-                      <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
-                    </filter>
-                  </defs>
-                  <text x="270" y="210" fontFamily="'Playfair Display', serif" fontWeight="900" fontSize={190} fill="rgba(255,255,255,0.12)" textAnchor="middle" letterSpacing={16} filter="url(#p-jam-glow)">JAM</text>
-                  <text x="270" y="210" fontFamily="'Playfair Display', serif" fontWeight="900" fontSize={190} fill="#ffffff" textAnchor="middle" letterSpacing={16}>JAM</text>
-                </svg>
+            <div className="w-full text-center">
+
+              {/* JAM divider */}
+              <div className="flex items-center justify-center gap-4 mb-6">
+                <div style={{ height: 1, width: 48, background: "linear-gradient(to right, transparent, rgba(120,60,200,0.55))" }} />
+                <span style={{ fontFamily: "'Courier Prime', monospace", fontSize: 11, fontWeight: 700, letterSpacing: "0.28em", color: "rgba(160,120,220,0.7)" }}>JAM</span>
+                <div style={{ height: 1, width: 48, background: "linear-gradient(to left, transparent, rgba(120,60,200,0.55))" }} />
               </div>
 
-              <div className="mb-1 text-xs uppercase" style={{ letterSpacing: "0.3em", color: "rgba(120,60,200,0.75)", fontFamily: "'Playfair Display', serif" }}>
-                Chord Detection Quality
-              </div>
-              <h1 className="mb-1 text-2xl font-semibold" style={{ fontFamily: "'Playfair Display', serif", color: "#f5ede0", letterSpacing: "0.02em" }}>
+              <p style={{ fontFamily: "'Courier Prime', monospace", fontSize: 11, fontWeight: 700, letterSpacing: "0.22em", color: "rgba(165,118,248,0.55)", marginBottom: 10 }}>
+                CHORD DETECTION QUALITY
+              </p>
+              <h1 style={{ fontFamily: "'Lora', serif", fontWeight: 700, fontSize: "clamp(22px, 4vw, 34px)", color: "#ffffff", margin: "0 0 8px", lineHeight: 1.15 }}>
                 {songName}
               </h1>
-              <p className="mb-8 text-sm" style={{ color: "rgba(190,160,230,0.45)", fontStyle: "italic" }}>
+              <p style={{ fontFamily: "'Lora', serif", fontSize: 14, color: "rgba(165,118,248,0.45)", fontStyle: "italic", marginBottom: 36 }}>
                 How thoroughly should JAM isolate harmonics before detecting chords?
               </p>
 
@@ -216,34 +360,28 @@ export default function PrepareJamPage({ params }: { params: Promise<{ id: strin
                 <button
                   type="button"
                   onClick={() => startAnalysis("hpss")}
-                  className="mode-card flex-1 rounded-xl px-6 py-7 text-left"
+                  className="mode-card flex-1 rounded-2xl px-6 py-7 text-left"
                   style={{
-                    background: "rgba(120,60,200,0.08)",
-                    border: "1px solid rgba(120,60,200,0.35)",
-                    boxShadow: "0 8px 30px rgba(0,0,0,0.35)",
-                  }}
-                  onMouseEnter={e => {
-                    (e.currentTarget as HTMLElement).style.borderColor = "rgba(120,60,200,0.75)";
-                    (e.currentTarget as HTMLElement).style.boxShadow = "0 12px 40px rgba(0,0,0,0.45), 0 0 28px rgba(120,60,200,0.2)";
-                    (e.currentTarget as HTMLElement).style.background = "rgba(120,60,200,0.14)";
-                  }}
-                  onMouseLeave={e => {
-                    (e.currentTarget as HTMLElement).style.borderColor = "rgba(120,60,200,0.35)";
-                    (e.currentTarget as HTMLElement).style.boxShadow = "0 8px 30px rgba(0,0,0,0.35)";
-                    (e.currentTarget as HTMLElement).style.background = "rgba(120,60,200,0.08)";
+                    background: "rgba(10,6,22,0.97)",
+                    border: "1.5px solid rgba(125,55,210,0.55)",
+                    boxShadow: "0 6px 32px rgba(0,0,0,0.65), 0 0 24px rgba(110,40,210,0.14)",
                   }}
                 >
-                  <div className="mb-3 text-2xl">⚡</div>
-                  <div className="mb-1 text-lg font-semibold" style={{ fontFamily: "'Playfair Display', serif", color: "#f5ede0" }}>
+                  <div className="mb-4 flex items-center justify-center w-10 h-10 rounded-xl" style={{ background: "rgba(115,45,210,0.22)", border: "1.5px solid rgba(140,70,225,0.4)" }}>
+                    <svg viewBox="0 0 24 24" width={18} height={18} fill="none" stroke="rgba(185,135,255,0.9)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+                    </svg>
+                  </div>
+                  <div style={{ fontFamily: "'Lora', serif", fontWeight: 700, fontSize: 18, color: "#ffffff", marginBottom: 4 }}>
                     Fast
                   </div>
-                  <div className="mb-4 text-xs font-bold tracking-widest uppercase" style={{ color: "rgba(120,60,200,0.8)", fontFamily: "'Courier Prime', monospace" }}>
-                    ~30 seconds
+                  <div style={{ fontFamily: "'Courier Prime', monospace", fontSize: 11, fontWeight: 700, letterSpacing: "0.14em", color: "rgba(165,118,248,0.7)", marginBottom: 16 }}>
+                    ~30 SECONDS
                   </div>
-                  <ul className="space-y-1.5 text-sm text-left" style={{ color: "rgba(190,160,230,0.6)" }}>
-                    <li>Removes drum transients</li>
-                    <li>Vocals remain in signal</li>
-                    <li>Good for instrumental tracks</li>
+                  <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 6 }}>
+                    {["Removes drum transients", "Vocals remain in signal", "Good for instrumental tracks"].map(item => (
+                      <li key={item} style={{ fontFamily: "'Lora', serif", fontSize: 13, color: "rgba(255,255,255,0.45)", fontStyle: "italic" }}>{item}</li>
+                    ))}
                   </ul>
                 </button>
 
@@ -251,37 +389,31 @@ export default function PrepareJamPage({ params }: { params: Promise<{ id: strin
                 <button
                   type="button"
                   onClick={() => startAnalysis("demucs")}
-                  className="mode-card flex-1 rounded-xl px-6 py-7 text-left"
+                  className="mode-card flex-1 rounded-2xl px-6 py-7 text-left"
                   style={{
-                    background: "rgba(255,255,255,0.04)",
-                    border: "1.5px solid rgba(255,255,255,0.28)",
-                    boxShadow: "0 8px 30px rgba(0,0,0,0.4), 0 0 20px rgba(255,255,255,0.06)",
-                  }}
-                  onMouseEnter={e => {
-                    (e.currentTarget as HTMLElement).style.borderColor = "rgba(255,255,255,0.65)";
-                    (e.currentTarget as HTMLElement).style.boxShadow = "0 12px 40px rgba(0,0,0,0.5), 0 0 35px rgba(255,255,255,0.15)";
-                    (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.07)";
-                  }}
-                  onMouseLeave={e => {
-                    (e.currentTarget as HTMLElement).style.borderColor = "rgba(255,255,255,0.28)";
-                    (e.currentTarget as HTMLElement).style.boxShadow = "0 8px 30px rgba(0,0,0,0.4), 0 0 20px rgba(255,255,255,0.06)";
-                    (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.04)";
+                    background: "rgba(10,6,22,0.97)",
+                    border: "1.5px solid rgba(125,55,210,0.55)",
+                    boxShadow: "0 6px 32px rgba(0,0,0,0.65), 0 0 24px rgba(110,40,210,0.14)",
                   }}
                 >
-                  <div className="mb-3 text-2xl">✦</div>
-                  <div className="mb-1 text-lg font-semibold" style={{ fontFamily: "'Playfair Display', serif", color: "#f5ede0" }}>
+                  <div className="mb-4 flex items-center justify-center w-10 h-10 rounded-xl" style={{ background: "rgba(115,45,210,0.22)", border: "1.5px solid rgba(140,70,225,0.4)" }}>
+                    <svg viewBox="0 0 24 24" width={18} height={18} fill="none" stroke="rgba(185,135,255,0.9)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M12 2a10 10 0 1 0 10 10" /><path d="M12 6v6l4 2" />
+                    </svg>
+                  </div>
+                  <div style={{ fontFamily: "'Lora', serif", fontWeight: 700, fontSize: 18, color: "#ffffff", marginBottom: 4 }}>
                     Accurate
                   </div>
-                  <div className="mb-0.5 text-xs font-bold tracking-widest uppercase" style={{ color: "rgba(220,200,160,0.75)", fontFamily: "'Courier Prime', monospace" }}>
-                    ~2–4 minutes
+                  <div style={{ fontFamily: "'Courier Prime', monospace", fontSize: 11, fontWeight: 700, letterSpacing: "0.14em", color: "rgba(165,118,248,0.7)", marginBottom: 4 }}>
+                    ~2–4 MINUTES
                   </div>
-                  <div className="mb-4 text-xs" style={{ color: "rgba(190,160,230,0.35)", fontFamily: "'Courier Prime', monospace" }}>
+                  <div style={{ fontFamily: "'Courier Prime', monospace", fontSize: 11, color: "rgba(165,118,248,0.3)", marginBottom: 12 }}>
                     first run downloads ~320 MB model
                   </div>
-                  <ul className="space-y-1.5 text-sm text-left" style={{ color: "rgba(190,160,230,0.6)" }}>
-                    <li>Removes drums <span style={{ color: "rgba(190,160,230,0.35)" }}>&amp;</span> vocals</li>
-                    <li>Isolates bass + instruments</li>
-                    <li>Best for vocal-heavy tracks</li>
+                  <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 6 }}>
+                    {["Removes drums & vocals", "Isolates bass + instruments", "Best for vocal-heavy tracks"].map(item => (
+                      <li key={item} style={{ fontFamily: "'Lora', serif", fontSize: 13, color: "rgba(255,255,255,0.45)", fontStyle: "italic" }}>{item}</li>
+                    ))}
                   </ul>
                 </button>
               </div>
@@ -289,53 +421,48 @@ export default function PrepareJamPage({ params }: { params: Promise<{ id: strin
 
           ) : (
             /* ── Loading / error screen ── */
-            <div
-              className="w-full max-w-xl px-8 py-10 text-center"
-              style={{
-                borderTop: "1px solid rgba(220,170,110,0.2)",
-                borderBottom: "1px solid rgba(220,170,110,0.2)",
-              }}
-            >
-              {/* Logo */}
-              <div className="relative mx-auto mb-6 flex justify-center">
-                <svg viewBox="0 0 540 300" xmlns="http://www.w3.org/2000/svg" className="relative h-auto w-[220px]" aria-label="JAM">
-                  <defs>
-                    <filter id="p-jam-glow2" x="-20%" y="-30%" width="140%" height="160%">
-                      <feGaussianBlur in="SourceGraphic" stdDeviation="12" result="blur" />
-                      <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
-                    </filter>
-                  </defs>
-                  <text x="270" y="210" fontFamily="'Playfair Display', serif" fontWeight="900" fontSize={190} fill="rgba(255,255,255,0.12)" textAnchor="middle" letterSpacing={16} filter="url(#p-jam-glow2)">JAM</text>
-                  <text x="270" y="210" fontFamily="'Playfair Display', serif" fontWeight="900" fontSize={190} fill="#ffffff" textAnchor="middle" letterSpacing={16}>JAM</text>
-                </svg>
+            <div className="w-full max-w-md text-center">
+
+              {/* JAM divider */}
+              <div className="flex items-center justify-center gap-4 mb-6">
+                <div style={{ height: 1, width: 48, background: "linear-gradient(to right, transparent, rgba(120,60,200,0.55))" }} />
+                <span style={{ fontFamily: "'Courier Prime', monospace", fontSize: 11, fontWeight: 700, letterSpacing: "0.28em", color: "rgba(160,120,220,0.7)" }}>JAM</span>
+                <div style={{ height: 1, width: 48, background: "linear-gradient(to left, transparent, rgba(120,60,200,0.55))" }} />
               </div>
 
-              <div className="mb-3 text-xs uppercase" style={{ letterSpacing: "0.3em", color: "rgba(120,60,200,0.75)", fontFamily: "'Playfair Display', serif" }}>
-                {errorMessage ? "Error" : "Loading"}
-              </div>
-
-              <h1 className="mb-3 text-2xl font-semibold" style={{ fontFamily: "'Playfair Display', serif", color: "#f5ede0", letterSpacing: "0.02em", fontWeight: 600 }}>
+              <p style={{ fontFamily: "'Courier Prime', monospace", fontSize: 11, fontWeight: 700, letterSpacing: "0.22em", color: "rgba(165,118,248,0.55)", marginBottom: 10 }}>
+                {errorMessage ? "ERROR" : phase === "checking" ? "LOADING" : "ANALYZING"}
+              </p>
+              <h1 style={{ fontFamily: "'Lora', serif", fontWeight: 700, fontSize: "clamp(20px, 3.5vw, 30px)", color: "#ffffff", margin: "0 0 24px", lineHeight: 1.2 }}>
                 {songName}
               </h1>
 
               {errorMessage ? (
                 <>
-                  <p className="mx-auto mb-6 max-w-md text-sm" style={{ color: "rgba(190,160,230,0.55)" }}>
+                  <p style={{ fontFamily: "'Lora', serif", fontSize: 14, color: "rgba(165,118,248,0.55)", fontStyle: "italic", marginBottom: 28, lineHeight: 1.6 }}>
                     {errorMessage}
                   </p>
                   <div className="flex flex-col items-center gap-3">
                     <button
                       type="button"
                       onClick={handleRetry}
-                      className="inline-flex rounded-lg px-5 py-3 text-sm font-medium text-white transition"
-                      style={{ background: "rgba(120,60,200,0.22)", border: "1px solid rgba(120,60,200,0.5)", cursor: "pointer", fontFamily: "'Lora', serif" }}
+                      className="action-btn inline-flex items-center rounded-lg px-6 py-3 text-sm font-bold"
+                      style={{
+                        background: "rgba(10,6,22,0.97)",
+                        border: "1.5px solid rgba(130,60,220,0.65)",
+                        boxShadow: "0 0 14px rgba(110,40,210,0.5), 0 6px 20px rgba(0,0,0,0.5)",
+                        fontFamily: "'Courier Prime', monospace",
+                        fontSize: 13,
+                        letterSpacing: "0.1em",
+                        color: "white",
+                        cursor: "pointer",
+                      }}
                     >
-                      Try Again
+                      TRY AGAIN
                     </button>
                     <Link
                       href={`/jam/${id}`}
-                      className="inline-flex rounded-lg px-5 py-3 text-sm font-medium transition"
-                      style={{ background: "rgba(120,60,200,0.08)", border: "1px solid rgba(120,60,200,0.25)", color: "rgba(190,160,230,0.65)", fontFamily: "'Lora', serif" }}
+                      style={{ fontFamily: "'Courier Prime', monospace", fontSize: 12, color: "rgba(165,118,248,0.4)", letterSpacing: "0.1em", textDecoration: "underline" }}
                     >
                       Open Jam Anyway
                     </Link>
@@ -343,20 +470,34 @@ export default function PrepareJamPage({ params }: { params: Promise<{ id: strin
                 </>
               ) : (
                 <>
-                  <p className="mx-auto mb-3 max-w-md text-sm" style={{ color: "rgba(190,160,230,0.45)" }}>
+                  <p style={{ fontFamily: "'Lora', serif", fontSize: 13, color: "rgba(165,118,248,0.4)", fontStyle: "italic", marginBottom: 8, lineHeight: 1.6 }}>
                     {stemMode === "demucs"
                       ? "Separating stems and building chord data. This takes a few minutes — worth the wait."
                       : "Building BPM and chord data for your first session."}
                   </p>
-                  <p className="mx-auto mb-8 text-xs" style={{ color: "rgba(190,160,230,0.28)", fontFamily: "'Courier Prime', monospace", letterSpacing: "0.08em" }}>
-                    {stemMode === "demucs" ? "MODE: ACCURATE (Demucs)" : "MODE: FAST (HPSS)"}
+                  <p style={{ fontFamily: "'Courier Prime', monospace", fontSize: 11, color: "rgba(165,118,248,0.25)", letterSpacing: "0.1em", marginBottom: 28 }}>
+                    {stemMode === "demucs" ? "MODE: ACCURATE (DEMUCS)" : "MODE: FAST (HPSS)"}
                   </p>
 
-                  <div className="mx-auto flex w-full max-w-[280px] items-center gap-3">
-                    <div className="h-[3px] flex-1 overflow-hidden rounded-full" style={{ background: "rgba(255,255,255,0.08)" }}>
-                      <div className="bar-pulse h-full rounded-full" style={{ background: "rgba(120,60,200,0.9)" }} />
+                  <div className="mx-auto w-full max-w-[300px]">
+                    <div className="flex justify-between items-center mb-2.5">
+                      <span style={{ fontFamily: "'Courier Prime', monospace", fontSize: 11, color: "rgba(165,118,248,0.65)", letterSpacing: "0.08em" }}>
+                        {phase === "checking" ? "Loading…" : phaseLabel}
+                      </span>
+                      <span style={{ fontFamily: "'Courier Prime', monospace", fontSize: 11, color: "rgba(165,118,248,0.35)", letterSpacing: "0.06em" }}>
+                        {phase === "analyzing" ? `${Math.round(progress)}%` : ""}
+                      </span>
                     </div>
-                    <span className="text-xs" style={{ color: "rgba(190,160,230,0.45)" }}>Analyzing…</span>
+                    <div className="h-[3px] w-full overflow-hidden rounded-full" style={{ background: "rgba(255,255,255,0.07)" }}>
+                      <div
+                        className="h-full rounded-full"
+                        style={{
+                          width: `${phase === "checking" ? 0 : progress}%`,
+                          background: "linear-gradient(90deg, rgba(100,35,200,0.9), rgba(165,75,255,0.95))",
+                          transition: "width 0.2s ease-out",
+                        }}
+                      />
+                    </div>
                   </div>
                 </>
               )}

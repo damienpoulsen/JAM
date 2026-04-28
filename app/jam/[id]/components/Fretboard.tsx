@@ -12,6 +12,26 @@ function hexLuminance(hex: string): number {
     return 0.299 * r + 0.587 * g + 0.114 * b;
 }
 
+type FretLayout = { leftPct: number; centerPct: number; widthPct: number };
+
+function computeFretLayout(fretCount: number, blend = 0.5): FretLayout[] {
+    const scalePos = (n: number) => 1 - Math.pow(2, -n / 12);
+    const totalSpan = scalePos(fretCount);
+    const equalWidth = 1 / fretCount;
+    const blendedWidths = Array.from({ length: fretCount }, (_, i) => {
+        const n = i + 1;
+        const proportionalWidth = (scalePos(n) - scalePos(n - 1)) / totalSpan;
+        return proportionalWidth * (1 - blend) + equalWidth * blend;
+    });
+    const layout: FretLayout[] = [];
+    let left = 0;
+    for (const w of blendedWidths) {
+        layout.push({ leftPct: left * 100, centerPct: (left + w / 2) * 100, widthPct: w * 100 });
+        left += w;
+    }
+    return layout;
+}
+
 type FretboardProps = {
     boardColorOverride?: string;
     stringColorOverride?: string;
@@ -27,6 +47,8 @@ type FretboardProps = {
     strings: number;
     tuning: string[];
     tuningIndex: number[];
+    fretDisplayMode?: "12" | "24";
+    onToggleFretDisplay?: () => void;
 };
 
 function NoteCircle({
@@ -110,6 +132,8 @@ export default function Fretboard({
     boardColorOverride,
     stringColorOverride,
     markerColorOverride,
+    fretDisplayMode,
+    onToggleFretDisplay,
     labelTextColor,
     noteTextColor,
     compact,
@@ -139,10 +163,11 @@ export default function Fretboard({
     const openNoteFallbackText = isDarkBoard ? "#f5f5f5" : "#111111";
     const openNoteFallbackBorder = isDarkBoard ? "2px solid #f5f5f5" : "2px solid #111111";
     const effectiveNoteTextColor = noteTextColor === "black" ? "#111111" : noteTextColor === "white" ? "#ffffff" : undefined;
+    const fretLayout = computeFretLayout(frets);
 
     return (
         <div className={`mt-0 flex flex-1 items-start justify-center ${compact ? "mb-0" : "mb-6"}`}>
-            <div className="w-[98%] max-w-[1600px]">
+            <div className={`w-[98%] ${frets === 24 ? "max-w-[1900px]" : "max-w-[1600px]"}`}>
                 <div
                     className="relative rounded-[24px] border-[3px] px-10 pt-5 pb-2"
                     style={{ borderColor: boardBorder, backgroundColor: boardBackground, boxShadow: boardGlow }}
@@ -212,16 +237,25 @@ export default function Fretboard({
                                     className="absolute left-0 right-0"
                                     style={{ top: `${0.5 * (100 / strings)}%`, bottom: `${0.5 * (100 / strings)}%` }}
                                 >
-                                    <div className="grid h-full w-full" style={{ gridTemplateColumns: `repeat(${frets}, 1fr)` }}>
-                                        {Array.from({ length: frets }).map((_, index) => (
-                                            <div key={index} className="h-full border-l-[3px]" style={{ borderColor: stringColor }} />
+                                    <div className="relative h-full w-full">
+                                        {fretLayout.map((f, index) => (
+                                            <div
+                                                key={index}
+                                                className="absolute top-0 bottom-0 border-l"
+                                                style={{
+                                                    left: `${f.leftPct}%`,
+                                                    width: `${f.widthPct}%`,
+                                                    borderColor: stringColor,
+                                                    borderLeftWidth: index === 11 && frets === 24 ? "5px" : "3px",
+                                                }}
+                                            />
                                         ))}
                                     </div>
                                 </div>
 
                                 {fretMarkers.map((fret) => {
-                                    const isDouble = fret === 12;
-                                    const left = `${(fret - 0.5) * (100 / frets)}%`;
+                                    const isDouble = fret === 12 || fret === 24;
+                                    const left = `${fretLayout[fret - 1].centerPct}%`;
                                     if (isDouble) {
                                         return (
                                             <div key={`marker-${fret}`} className="absolute" style={{ left, top: "50%", transform: "translate(-50%, -50%)" }}>
@@ -248,7 +282,7 @@ export default function Fretboard({
                                                 key={`${fretIndex}-${stringIndex}`}
                                                 className="absolute flex items-center justify-center"
                                                 style={{
-                                                    left: `${(fretIndex + 0.5) * (100 / frets)}%`,
+                                                    left: `${fretLayout[fretIndex].centerPct}%`,
                                                     top: `${(strings - stringIndex - 0.5) * (100 / strings)}%`,
                                                     transform: "translate(-50%, -50%)",
                                                 }}
@@ -268,18 +302,41 @@ export default function Fretboard({
                                 )}
                             </div>
 
-                            <div className="flex h-[32px] items-start pt-1">
-                                {Array.from({ length: frets }).map((_, fretIndex) => {
+                            <div className="relative h-[32px]">
+                                {fretLayout.map((f, fretIndex) => {
                                     const fretNumber = fretIndex + 1;
+                                    if (!fretMarkers.includes(fretNumber)) return null;
                                     return (
-                                        <div key={`label-${fretNumber}`} className="flex-1 text-center text-[14px] font-extrabold tracking-[0.08em]" style={{ color: labelColor }}>
-                                            {fretMarkers.includes(fretNumber) ? `${fretNumber}fr.` : ""}
+                                        <div
+                                            key={`label-${fretNumber}`}
+                                            className="absolute pt-1 text-center text-[14px] font-extrabold tracking-[0.08em]"
+                                            style={{ left: `${f.centerPct}%`, transform: "translateX(-50%)", color: labelColor }}
+                                        >
+                                            {`${fretNumber}fr.`}
                                         </div>
                                     );
                                 })}
                             </div>
                         </div>
                     </div>
+                    {onToggleFretDisplay && (
+                        <button
+                            type="button"
+                            onClick={onToggleFretDisplay}
+                            className="absolute rounded-[10px] border px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] transition-colors"
+                            style={{
+                                bottom: "9px",
+                                left: "9px",
+                                fontFamily: "'Rajdhani', sans-serif",
+                                color: "rgba(255,255,255,0.80)",
+                                borderColor: "rgba(255,255,255,0.30)",
+                                background: "rgba(0,0,0,0.70)",
+                                boxShadow: "0 0 10px rgba(255,255,255,0.25), 0 0 22px rgba(255,255,255,0.10)",
+                            }}
+                        >
+                            {fretDisplayMode === "24" ? "12 frets" : "24 frets"}
+                        </button>
+                    )}
                 </div>
             </div>
         </div>

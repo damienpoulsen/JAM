@@ -24,7 +24,7 @@ const STEPS = [
   {
     target: "layers-btn",
     title: "Switch your theory view",
-    body: "This is where you control what theory appears on the fretboard — choose a preset or dial in your own.",
+    body: "This is where you control what appears on the fretboard — scales, chord tones, triads, arpeggios, and more.",
   },
   {
     target: "overlay-rows",

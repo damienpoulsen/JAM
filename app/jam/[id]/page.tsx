@@ -3,7 +3,6 @@
 import { use } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useForm, ValidationError } from "@formspree/react";
-import ChordDisplay from "./components/ChordDisplay";
 import ColorWheelPicker from "./components/ColorWheelPicker";
 import Fretboard from "./components/Fretboard";
 import LeftMenuPanel from "./components/LeftMenuPanel";
@@ -16,10 +15,8 @@ import MobilePlaybackControls from "./components/MobilePlaybackControls";
 import {
     buildLayer,
     theorySettingsToLayerConfigs,
-    applyTheoryPreset,
     DEFAULT_THEORY,
     type TheorySettings,
-    type TheoryPreset,
     type Layer,
 } from "@/lib/layers";
 import { mergeLayers } from "../../../lib/layerManager";
@@ -173,6 +170,36 @@ function getDisplayReferenceNoteIndex(currentChord: string, songKey: string): nu
     return noteIndex === undefined ? null : noteIndex;
 }
 
+type ChordLabelMode = "off" | "roman" | "number" | "theory";
+
+const MAJOR_SCALE_INTERVALS = [0, 2, 4, 5, 7, 9, 11];
+const MINOR_SCALE_INTERVALS = [0, 2, 3, 5, 7, 8, 10];
+const ROMAN_MAJOR = ["I", "ii", "iii", "IV", "V", "vi", "vii°"];
+const ROMAN_MINOR = ["i", "ii°", "III", "iv", "v", "VI", "VII"];
+const NUMBER_DEGREE = ["1", "2", "3", "4", "5", "6", "7"];
+const THEORY_MAJOR = ["Tonic", "Supertonic", "Mediant", "Subdominant", "Dominant", "Submediant", "Leading Tone"];
+const THEORY_MINOR = ["Tonic", "Supertonic", "Mediant", "Subdominant", "Dominant", "Submediant", "Subtonic"];
+
+function getChordLabel(chord: string, songKey: string, mode: ChordLabelMode): string {
+    if (mode === "off" || !chord || !songKey || songKey === "Unknown") return "";
+    const keyMatch = songKey.trim().match(/^([A-G](?:#|b)?)(m)?/);
+    if (!keyMatch) return "";
+    const keyIdx = DISPLAY_NOTE_INDEX[keyMatch[1]];
+    if (keyIdx === undefined) return "";
+    const keyIsMinor = !!keyMatch[2];
+    const chordMatch = chord.trim().match(/^([A-G](?:#|b)?)/);
+    if (!chordMatch) return "";
+    const chordIdx = DISPLAY_NOTE_INDEX[chordMatch[1]];
+    if (chordIdx === undefined) return "";
+    const interval = ((chordIdx - keyIdx) + 12) % 12;
+    const scale = keyIsMinor ? MINOR_SCALE_INTERVALS : MAJOR_SCALE_INTERVALS;
+    const degree = scale.indexOf(interval);
+    if (degree === -1) return "";
+    if (mode === "roman") return (keyIsMinor ? ROMAN_MINOR : ROMAN_MAJOR)[degree];
+    if (mode === "number") return NUMBER_DEGREE[degree];
+    return (keyIsMinor ? THEORY_MINOR : THEORY_MAJOR)[degree];
+}
+
 // Song helpers normalize localStorage data so the page can survive stale or partial records.
 function normalizeSong(song: Partial<Song> | null | undefined, fallbackId = ""): Song {
     const rawBpm = song?.bpm;
@@ -221,7 +248,24 @@ function readTheorySettings(songId: string): TheorySettings {
     if (typeof window === "undefined") return DEFAULT_THEORY;
     try {
         const stored = localStorage.getItem(`jam-theory-${songId}`);
-        return stored ? (JSON.parse(stored) as TheorySettings) : DEFAULT_THEORY;
+        if (!stored) return DEFAULT_THEORY;
+        const raw = JSON.parse(stored) as Record<string, unknown>;
+        // Migrate from old field names
+        if ("baseKind" in raw) {
+            return {
+                layer1Kind: raw.baseKind === "off" ? null : (raw.baseKind as TheorySettings["layer1Kind"]),
+                layer1Color: (raw.baseColor as string) ?? DEFAULT_THEORY.layer1Color,
+                layer1Interval: null,
+                layer2Kind: (raw.overlayKind as TheorySettings["layer2Kind"]) ?? null,
+                layer2Color: (raw.overlayColor as string) ?? DEFAULT_THEORY.layer2Color,
+                layer2Interval: (raw.overlayInterval as number | null) ?? null,
+                layer2Filled: (raw.overlayFilled as boolean) ?? false,
+                layer3Kind: (raw.overlay2Kind as TheorySettings["layer3Kind"]) ?? null,
+                layer3Color: (raw.overlay2Color as string) ?? DEFAULT_THEORY.layer3Color,
+                layer3Interval: (raw.overlay2Interval as number | null) ?? null,
+            };
+        }
+        return raw as TheorySettings;
     } catch { return DEFAULT_THEORY; }
 }
 
@@ -333,6 +377,7 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
     const [fretLabelTextColor, setFretLabelTextColor] = useState<TextColorMode>("black");
     const [noteTextColor, setNoteTextColor] = useState<TextColorMode>("white");
     const [chordDisplayColor, setChordDisplayColor] = useState("#ffffff");
+    const [chordLabelMode, setChordLabelMode] = useState<ChordLabelMode>("roman");
     const [controlCenterColor, setControlCenterColor] = useState("#222222");
     const [playheadColor, setPlayheadColor] = useState("#222222");
     const [playbackContentColor, setPlaybackContentColor] = useState("#ffffff");
@@ -343,6 +388,8 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
     const [presetNameDraft, setPresetNameDraft] = useState("");
     const [editingName, setEditingName] = useState(false);
     const [volumeOpen, setVolumeOpen] = useState(false);
+    const [controlCenterOpen, setControlCenterOpen] = useState(false);
+    const [fretDisplayMode, setFretDisplayMode] = useState<"12" | "24">("12");
     const [mobileSettingsOpen, setMobileSettingsOpen] = useState(false);
     const [feedbackOpen, setFeedbackOpen] = useState(false);
     const [feedbackState, submitFeedback] = useForm("maqadgga");
@@ -359,11 +406,11 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
     const songFound = songRecord.found || Boolean(songDrafts[id]);
 
     const strings = 6;
-    const frets = 12;
+    const frets = fretDisplayMode === "24" ? 24 : 12;
     const tuning = ["E", "A", "D", "G", "B", "E"];
     const notes = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
     const tuningIndex = tuning.map((note) => notes.indexOf(note));
-    const fretMarkers = [3, 5, 7, 9, 12];
+    const fretMarkers = fretDisplayMode === "24" ? [3, 5, 7, 9, 12, 15, 17, 19, 21, 24] : [3, 5, 7, 9, 12];
 
     const keyOptions = [
         "Unknown",
@@ -415,12 +462,14 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
         () => getChordDisplayState(chordTimeline, currentTime),
         [chordTimeline, currentTime]
     );
+    const effectiveChord = currentChord || chordTimeline[0]?.chord || "";
+    const chordLabel = getChordLabel(currentChord, song.key, chordLabelMode);
     const layers = useMemo(
         () =>
             theorySettingsToLayerConfigs(theorySettings)
-                .map((config) => buildLayer(config, { songKey: song.key, currentChord }))
+                .map((config) => buildLayer(config, { songKey: song.key, currentChord: effectiveChord }))
                 .filter((l): l is Layer => l !== null),
-        [theorySettings, currentChord, song.key]
+        [theorySettings, effectiveChord, song.key]
     );
 
     const mergedNotes = useMemo(() => mergeLayers(layers), [layers]);
@@ -481,6 +530,23 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
         }));
         saveSong(nextSong);
     }, [id, song]);
+
+    const resetToDefaultColors = () => {
+        setBgColor("#000000");
+        setBgAccentColor("#5b21b6");
+        setBgMode("solid");
+        setBoardColor("#fce6c5");
+        setStringColor("#000000");
+        setMarkerColor("#777777");
+        setFretLabelTextColor("black");
+        setNoteTextColor("white");
+        setChordDisplayColor("#ffffff");
+        setControlCenterColor("#222222");
+        setPlayheadColor("#222222");
+        setPlaybackContentColor("#ffffff");
+        setLeftBarColor("#2f302d");
+        setPanelTextMode("dark");
+    };
 
     const applyPreset = (preset: ColorPreset) => {
         setBgColor(preset.bgColor);
@@ -573,6 +639,7 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
                     setAudioURL("");
                     setVideoURL(null);
                     setVideoMode(false);
+                    if (panelView === "control-center") setPanelView("main");
                     setAudioError("Audio file is unavailable for this song.");
                     return;
                 }
@@ -588,6 +655,7 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
                 } else {
                     setVideoURL(null);
                     setVideoMode(false);
+                    if (panelView === "control-center") setPanelView("main");
                 }
             } catch (error) {
                 console.error("Failed to load audio file", error);
@@ -880,6 +948,7 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
 
     const enterVideoMode = () => {
         audioRef.current?.pause();
+        setControlCenterOpen(false);
         setVideoMode(true);
     };
 
@@ -1083,8 +1152,8 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
 
             {/* Left panel + handle (slide together) */}
             <div
-                className="absolute top-0 right-0 z-40 h-full transition-all duration-300 hidden min-[900px]:block"
-                style={{ transform: panelOpen ? "translateX(0)" : "translateX(240px)" }}
+                className="absolute top-0 z-40 h-full transition-all duration-300 hidden min-[900px]:block"
+                style={{ right: panelOpen ? "0px" : "-240px" }}
             >
                 {/* Panel content */}
                 <div className="h-full w-[240px] overflow-hidden border-l transition-colors duration-300" style={{ background: leftBarColor, borderColor: panel.border }}>
@@ -1102,7 +1171,7 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
                                 {([
                                     { view: "page-bg",        label: "Page Background",  dot: bgMode === "gradient" ? bgAccentColor : bgColor },
                                     { view: "fretboard",      label: "Fretboard",        dot: boardColor },
-                                    { view: "control-center", label: "Control Center",   dot: controlCenterColor },
+                                    ...(videoURL ? [{ view: "control-center" as PanelView, label: "Control Center", dot: controlCenterColor }] : []),
                                     { view: "playback",       label: "Playback Controls",dot: playheadColor },
                                     { view: "chord-display",  label: "Chord Display",    dot: chordDisplayColor === "transparent" ? "#888888" : chordDisplayColor },
                                 ] as { view: PanelView; label: string; dot: string }[]).map(({ view, label, dot }) => (
@@ -1179,6 +1248,23 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
                                         );
                                     })}
                                 </div>
+
+                                {/* Divider */}
+                                <div className="my-3" style={{ height: 1, background: panel.divider }} />
+
+                                {/* Reset to defaults */}
+                                <button
+                                    type="button"
+                                    onClick={resetToDefaultColors}
+                                    className="w-full rounded-lg px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.12em] transition-opacity hover:opacity-70"
+                                    style={{
+                                        fontFamily: "'Rajdhani', sans-serif",
+                                        color: panel.inactiveText,
+                                        border: `1px dashed ${panel.swatchBorder}`,
+                                    }}
+                                >
+                                    Reset to Default
+                                </button>
                             </div>
                         ) : (
                             /* ── Sub-view ── */
@@ -1194,7 +1280,7 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
                                     {{
                                         "page-bg":        "Page Background",
                                         "fretboard":      "Fretboard",
-                                        "control-center": "Control Center",
+                                        ...(videoURL ? { "control-center": "Control Center" } : {}),
                                         "playback":       "Playback Controls",
                                         "chord-display":  "Chord Display",
                                     }[panelView]}
@@ -1273,7 +1359,7 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
                                 )}
 
                                 {/* ── Control Center ── */}
-                                {panelView === "control-center" && (
+                                {videoURL && panelView === "control-center" && (
                                     <div className="flex items-center justify-between">
                                         <span className="text-[12px] font-semibold" style={{ fontFamily: "'Rajdhani', sans-serif", color: panel.text }}>Bar Color</span>
                                         <ColorWheelPicker value={controlCenterColor} label="Control Center" onChange={setControlCenterColor} trigger={(onClick) => (
@@ -1360,6 +1446,8 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
                 songName={song.name}
                 songId={id}
                 onStartTour={() => setTourActive(true)}
+                chordLabelMode={chordLabelMode}
+                onChordLabelModeChange={setChordLabelMode}
             />
 
             <div className="hidden min-[900px]:flex relative h-full flex-col px-8 pt-0 pb-2">
@@ -1392,128 +1480,217 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
                         </div>
                     ) : (
                         <>
-                            {/* Top section: VideoPanel in video mode, ChordDisplay otherwise */}
+                            {/* Top section: video mode = stable three-column row; normal mode = Key/BPM + big chord */}
                             {videoMode && videoURL ? (
-                                <div className="mb-2">
-                                    <VideoPanel
-                                        videoRef={videoRef}
-                                        videoURL={videoURL}
-                                        currentChord={currentChord}
-                                        nextChord={nextChord}
-                                        chordTextColor={chordDisplayColor}
-                                        muted={voxRemoval && !!instrumentalURL}
-                                        overlayControls={
-                                            <OverlayControls
-                                                barColor={controlCenterColor}
-                                                audioError={visibleAudioError}
-                                                theorySettings={theorySettings}
-                                                onTheoryChange={setTheorySettings}
-                                                loopMode={loopMode}
-                                                metronomeBpm={metronomeBpm}
-                                                metronomeEnabled={metronomeEnabled}
-                                                metronomeOpen={metronomeOpen}
-                                                noteDisplayMode={noteDisplayMode}
-                                                onDecreaseTempo={() => updatePlaybackRate(playbackRate - 0.1)}
-                                                onIncreaseTempo={() => updatePlaybackRate(playbackRate + 0.1)}
-                                                onDecreaseMetronomeBpm={() => setMetronomeBpmOverride({ songId: id, bpm: Math.max(30, metronomeBpm - 1) })}
-                                                onTempoDisplayModeChange={setTempoDisplayMode}
-                                                onIncreaseMetronomeBpm={() => setMetronomeBpmOverride({ songId: id, bpm: Math.min(260, metronomeBpm + 1) })}
-                                                onToggleLoopMode={toggleLoopMode}
-                                                onToggleMetronome={() => setMetronomeEnabled((current) => !current)}
-                                                onToggleMetronomeOpen={() => setMetronomeOpen((current) => !current)}
-                                                onToggleNoteDisplayMode={() => setNoteDisplayMode((currentMode) => currentMode === "notes" ? "intervals" : "notes")}
-                                                voxRemoval={voxRemoval}
-                                                voxLoading={voxLoading}
-                                                voxError={voxError}
-                                                onToggleVoxRemoval={() => { void toggleVoxRemoval(); }}
-                                                playbackRate={playbackRate}
-                                                tempoDisplayMode={tempoDisplayMode}
-                                                baseBpm={displayBpm === "--" ? null : typeof displayBpm === "number" ? displayBpm : Number(displayBpm) || null}
-                                            />
-                                        }
-                                        onExitVideoMode={exitVideoMode}
-                                    />
+                                <div className="relative flex items-start w-full gap-2" style={{ marginBottom: "-11px" }}>
+                                    {/* Left column: spacer only — button is absolutely positioned in the outer div */}
+                                    <div className="flex-shrink-0" style={{ width: "180px", height: "300px" }} />
+                                    {/* Key / BPM — same as normal mode, floated above Control Center */}
+                                    <div style={{ position: "absolute", top: "67px", left: "246px", zIndex: 30 }}>
+                                        <div className="flex w-[220px] flex-col items-start gap-2">
+                                            <div className="relative flex w-full items-center justify-start">
+                                                <span className="mr-3 text-lg" style={{ color: "rgba(255,255,255,0.55)", width: "54px", display: "inline-block" }}>Key:</span>
+                                                <div className="relative">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => { setKeyOpen(!keyOpen); }}
+                                                        className="min-w-[120px] cursor-pointer rounded border-2 px-4 py-1 text-center text-lg border-white bg-black text-white shadow-[0_0_0_2px_rgba(255,255,255,0.2),0_0_14px_rgba(255,255,255,0.14)]"
+                                                    >
+                                                        {song.key}
+                                                    </button>
+                                                    {keyOpen && <div className="fixed inset-0 z-40" onClick={() => setKeyOpen(false)} />}
+                                                    {keyOpen && (
+                                                        <div className="absolute left-0 z-50 mt-2 rounded-xl border p-3 shadow-[0_18px_40px_rgba(0,0,0,0.35)] border-white/12" style={{ width: 220, background: "#0f0f0f" }}>
+                                                            <div className="mb-2 text-[10px] uppercase tracking-[0.16em]" style={{ fontFamily: "'Rajdhani', sans-serif", color: "rgba(255,255,255,0.55)" }}>Select Root Note</div>
+                                                            <div className="grid grid-cols-4 gap-1.5">
+                                                                {keyOptions.filter(k => k !== "Unknown" && !k.includes("m")).map((note) => (
+                                                                    <button key={note} type="button" onClick={() => { updateSong({ key: note }); setKeyOpen(false); }} className="rounded-lg border py-2 text-sm font-semibold transition border-white/12 bg-white/5 text-white hover:border-white/40 hover:bg-white/15" style={{ fontFamily: "'Rajdhani', sans-serif" }}>{note}</button>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center justify-start w-full">
+                                                <span className="mr-3 text-lg" style={{ color: "rgba(255,255,255,0.55)", width: "54px", display: "inline-block" }}>BPM:</span>
+                                                <input
+                                                    type="number"
+                                                    className="min-w-[120px] rounded border-2 px-4 py-1 text-center text-lg border-white bg-black text-white shadow-[0_0_0_2px_rgba(255,255,255,0.2),0_0_14px_rgba(255,255,255,0.14)]"
+                                                    value={displayBpm === "--" ? "" : displayBpm}
+                                                    onChange={(e) => updateSong({ bpm: e.target.value })}
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+                                    {/* Control Center button: floats freely, no effect on other elements */}
+                                    <button
+                                        type="button"
+                                        onClick={() => setControlCenterOpen((v) => !v)}
+                                        className="flex items-center gap-2 rounded-lg px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.18em] border transition-colors"
+                                        style={{
+                                            position: "absolute",
+                                            bottom: "46px",
+                                            left: "293px",
+                                            background: controlCenterColor,
+                                            color: controlCenterOpen ? "rgba(255,255,255,0.92)" : "rgba(255,255,255,0.55)",
+                                            borderColor: controlCenterOpen ? "rgba(255,255,255,0.30)" : "rgba(255,255,255,0.10)",
+                                            fontFamily: "'Rajdhani', sans-serif",
+                                        }}
+                                    >
+                                        Control Center
+                                    </button>
+                                    {/* Center column: Video — fixed 300px tall, max 575px wide */}
+                                    <div className="flex-1 min-w-0 flex justify-center">
+                                        <div className="overflow-hidden rounded-xl" style={{ height: "300px", width: "100%", maxWidth: "575px" }}>
+                                            <VideoPanel videoRef={videoRef} videoURL={videoURL} muted={voxRemoval && !!instrumentalURL} />
+                                        </div>
+                                    </div>
+                                    {/* Right column: current chord, next chord, exit — shifted left to center on video/chord boundary */}
+                                    <div className="flex-shrink-0 relative flex flex-col items-center gap-1 select-none pointer-events-none" style={{ width: "220px", left: "-230px" }}>
+                                        <div className="w-full text-center font-bold leading-none" style={{ fontSize: "clamp(5rem,12vw,185px)", fontFamily: "'Playfair Display', serif", color: chordDisplayColor }}>
+                                            {currentChord || "—"}
+                                        </div>
+                                        {chordLabel && (
+                                            <div className="w-full text-left" style={{
+                                                fontFamily: "'Rajdhani', sans-serif",
+                                                fontWeight: 700,
+                                                color: chordDisplayColor,
+                                                opacity: 0.6,
+                                                lineHeight: 1,
+                                                fontSize: chordLabel.length <= 2
+                                                    ? "clamp(1rem,2.5vw,32px)"
+                                                    : chordLabel.length <= 4
+                                                        ? "clamp(0.6rem,1.5vw,20px)"
+                                                        : chordLabel.length <= 7
+                                                            ? "clamp(0.5rem,0.9vw,12px)"
+                                                            : "clamp(0.4rem,0.7vw,10px)",
+                                            }}>
+                                                {chordLabel}
+                                            </div>
+                                        )}
+                                        <div className="w-full text-center leading-none" style={{ fontSize: "clamp(2.5rem,6.5vw,104px)", fontFamily: "'Playfair Display', serif", color: chordDisplayColor, opacity: 0.45, minHeight: "1.2em" }}>
+                                            {nextChord && nextChord !== currentChord ? nextChord : ""}
+                                        </div>
+                                    </div>
                                 </div>
                             ) : (
                                 <div style={{ backgroundColor: "transparent" }}>
-                                    <ChordDisplay
-                                        isDark={true}
-                                        chordTextColor={chordDisplayColor}
-                                        bpm={displayBpm}
-                                        currentChord={currentChord}
-                                        keyOpen={keyOpen}
-                                        keyOptions={keyOptions}
-                                        nextChord={nextChord}
-                                        onBpmChange={(nextValue) => { updateSong({ bpm: nextValue }); }}
-                                        onKeySelect={(keyOption) => { updateSong({ key: keyOption }); setKeyOpen(false); }}
-                                        onToggleKeyOpen={() => setKeyOpen(!keyOpen)}
-                                        songKey={song.key}
-                                    />
+                                    {/* Top-right row: Key/BPM in normal mode */}
+                                    <div className="relative z-30 mt-1 mb-0 flex justify-end">
+                                        <div className="mt-1 mb-0 flex w-[220px] flex-col items-end gap-2">
+                                            <div className="relative flex w-full items-center justify-end">
+                                                <span className="mr-3 text-lg" style={{ color: "rgba(255,255,255,0.55)" }}>Key:</span>
+                                                <div className="relative">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => { setKeyOpen(!keyOpen); }}
+                                                        className="min-w-[120px] cursor-pointer rounded border-2 px-4 py-1 text-center text-lg border-white bg-black text-white shadow-[0_0_0_2px_rgba(255,255,255,0.2),0_0_14px_rgba(255,255,255,0.14)]"
+                                                    >
+                                                        {song.key}
+                                                    </button>
+                                                    {keyOpen && <div className="fixed inset-0 z-40" onClick={() => setKeyOpen(false)} />}
+                                                    {keyOpen && (
+                                                        <div className="absolute right-0 z-50 mt-2 rounded-xl border p-3 shadow-[0_18px_40px_rgba(0,0,0,0.35)] border-white/12" style={{ width: 220, background: "#0f0f0f" }}>
+                                                            <div className="mb-2 text-[10px] uppercase tracking-[0.16em]" style={{ fontFamily: "'Rajdhani', sans-serif", color: "rgba(255,255,255,0.55)" }}>Select Root Note</div>
+                                                            <div className="grid grid-cols-4 gap-1.5">
+                                                                {keyOptions.filter(k => k !== "Unknown" && !k.includes("m")).map((note) => (
+                                                                    <button key={note} type="button" onClick={() => { updateSong({ key: note }); setKeyOpen(false); }} className="rounded-lg border py-2 text-sm font-semibold transition border-white/12 bg-white/5 text-white hover:border-white/40 hover:bg-white/15" style={{ fontFamily: "'Rajdhani', sans-serif" }}>{note}</button>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center justify-end w-full">
+                                                <span className="mr-3 text-lg" style={{ color: "rgba(255,255,255,0.55)" }}>BPM:</span>
+                                                <input
+                                                    type="number"
+                                                    className="min-w-[120px] rounded border-2 px-4 py-1 text-center text-lg border-white bg-black text-white shadow-[0_0_0_2px_rgba(255,255,255,0.2),0_0_14px_rgba(255,255,255,0.14)]"
+                                                    value={displayBpm === "--" ? "" : displayBpm}
+                                                    onChange={(e) => updateSong({ bpm: e.target.value })}
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+                                    {/* Main chord area: big chord text in normal mode */}
+                                    <div className="-mt-14 flex flex-col">
+                                        <div data-tour="chords" className="pointer-events-none mb-6 mt-[-72px] flex items-start justify-center gap-10 px-4">
+                                            <div className="relative">
+                                                <div className="max-w-[70vw] truncate text-[clamp(7.5rem,15vw,248px)] font-bold leading-none drop-shadow-[0_10px_24px_rgba(0,0,0,0.25)]" style={{ color: chordDisplayColor }}>
+                                                    {currentChord || "—"}
+                                                </div>
+                                                {chordLabel && (
+                                                    <div className="absolute pointer-events-none" style={{ left: "-5rem", bottom: "3.75rem",
+                                                        fontFamily: "'Rajdhani', sans-serif",
+                                                        fontWeight: 700,
+                                                        color: chordDisplayColor,
+                                                        opacity: 0.6,
+                                                        lineHeight: 1,
+                                                        fontSize: chordLabel.length <= 2
+                                                            ? "clamp(1.75rem,3.5vw,45px)"
+                                                            : chordLabel.length <= 4
+                                                                ? "clamp(1rem,2vw,28px)"
+                                                                : chordLabel.length <= 7
+                                                                    ? "clamp(0.65rem,1.2vw,16px)"
+                                                                    : "clamp(0.5rem,0.9vw,12px)",
+                                                    }}>
+                                                        {chordLabel}
+                                                    </div>
+                                                )}
+                                            </div>
+                                            <div className="mt-16 max-w-[26vw] truncate text-[clamp(3.5rem,7vw,108px)] leading-none" style={{ color: chordDisplayColor ? `${chordDisplayColor}66` : "rgba(255,255,255,0.40)" }}>
+                                                {nextChord}
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             )}
 
-                            {/* Fretboard + controls — always visible */}
-                            <div className="-mt-5 flex flex-col">
-                                <div className="-mt-5 flex flex-col">
-                                    {!videoMode && (
-                                        <>
-                                            <OverlayControls
-                                                barColor={controlCenterColor}
-                                                audioError={visibleAudioError}
-                                                theorySettings={theorySettings}
-                                                onTheoryChange={setTheorySettings}
-                                                loopMode={loopMode}
-                                                metronomeBpm={metronomeBpm}
-                                                metronomeEnabled={metronomeEnabled}
-                                                metronomeOpen={metronomeOpen}
-                                                noteDisplayMode={noteDisplayMode}
-                                                onDecreaseTempo={() => updatePlaybackRate(playbackRate - 0.1)}
-                                                onIncreaseTempo={() => updatePlaybackRate(playbackRate + 0.1)}
-                                                onDecreaseMetronomeBpm={() =>
-                                                    setMetronomeBpmOverride({
-                                                        songId: id,
-                                                        bpm: Math.max(30, metronomeBpm - 1),
-                                                    })
-                                                }
-                                                onTempoDisplayModeChange={setTempoDisplayMode}
-                                                onIncreaseMetronomeBpm={() =>
-                                                    setMetronomeBpmOverride({
-                                                        songId: id,
-                                                        bpm: Math.min(260, metronomeBpm + 1),
-                                                    })
-                                                }
-                                                onToggleLoopMode={toggleLoopMode}
-                                                onToggleMetronome={() => setMetronomeEnabled((current) => !current)}
-                                                onToggleMetronomeOpen={() => setMetronomeOpen((current) => !current)}
-                                                onToggleNoteDisplayMode={() =>
-                                                    setNoteDisplayMode((currentMode) =>
-                                                        currentMode === "notes" ? "intervals" : "notes"
-                                                    )
-                                                }
-                                                voxRemoval={voxRemoval}
-                                                voxLoading={voxLoading}
-                                                voxError={voxError}
-                                                onToggleVoxRemoval={() => { void toggleVoxRemoval(); }}
-                                                playbackRate={playbackRate}
-                                                tempoDisplayMode={tempoDisplayMode}
-                                                baseBpm={displayBpm === "--" ? null : typeof displayBpm === "number" ? displayBpm : Number(displayBpm) || null}
-                                            />
-                                            {videoURL && (
-                                                <div className="flex justify-end px-1 mt-1">
-                                                    <button
-                                                        type="button"
-                                                        onClick={enterVideoMode}
-                                                        className="flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] uppercase tracking-widest border transition-colors"
-                                                        style={{ color: "rgba(255,255,255,0.45)", borderColor: "rgba(255,255,255,0.12)" }}
-                                                        onMouseEnter={e => { e.currentTarget.style.color = "rgba(255,255,255,0.75)"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.28)"; }}
-                                                        onMouseLeave={e => { e.currentTarget.style.color = "rgba(255,255,255,0.45)"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.12)"; }}
-                                                    >
-                                                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
-                                                        Video
-                                                    </button>
-                                                </div>
-                                            )}
-                                        </>
+                            {/* Fretboard + controls */}
+                            <div className={videoMode ? "flex flex-col" : "-mt-5 flex flex-col"}>
+                                <div className={videoMode ? "flex flex-col" : "-mt-5 flex flex-col"}>
+                                    {(!videoMode || controlCenterOpen) && (
+                                        <OverlayControls
+                                            barColor={controlCenterColor}
+                                            audioError={visibleAudioError}
+                                            theorySettings={theorySettings}
+                                            onTheoryChange={setTheorySettings}
+                                            loopMode={loopMode}
+                                            metronomeBpm={metronomeBpm}
+                                            metronomeEnabled={metronomeEnabled}
+                                            metronomeOpen={metronomeOpen}
+                                            noteDisplayMode={noteDisplayMode}
+                                            onDecreaseTempo={() => updatePlaybackRate(playbackRate - 0.1)}
+                                            onIncreaseTempo={() => updatePlaybackRate(playbackRate + 0.1)}
+                                            onDecreaseMetronomeBpm={() =>
+                                                setMetronomeBpmOverride({
+                                                    songId: id,
+                                                    bpm: Math.max(30, metronomeBpm - 1),
+                                                })
+                                            }
+                                            onTempoDisplayModeChange={setTempoDisplayMode}
+                                            onIncreaseMetronomeBpm={() =>
+                                                setMetronomeBpmOverride({
+                                                    songId: id,
+                                                    bpm: Math.min(260, metronomeBpm + 1),
+                                                })
+                                            }
+                                            onToggleLoopMode={toggleLoopMode}
+                                            onToggleMetronome={() => setMetronomeEnabled((current) => !current)}
+                                            onToggleMetronomeOpen={() => setMetronomeOpen((current) => !current)}
+                                            onToggleNoteDisplayMode={() =>
+                                                setNoteDisplayMode((currentMode) =>
+                                                    currentMode === "notes" ? "intervals" : "notes"
+                                                )
+                                            }
+                                            voxRemoval={voxRemoval}
+                                            voxLoading={voxLoading}
+                                            voxError={voxError}
+                                            onToggleVoxRemoval={() => { void toggleVoxRemoval(); }}
+                                            playbackRate={playbackRate}
+                                            tempoDisplayMode={tempoDisplayMode}
+                                            baseBpm={displayBpm === "--" ? null : typeof displayBpm === "number" ? displayBpm : Number(displayBpm) || null}
+                                        />
                                     )}
 
                                     <div data-tour="fretboard">
@@ -1527,10 +1704,12 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
                                         frets={frets}
                                         getDisplayedFretboardLabel={getDisplayedFretboardLabel}
                                         mergedNoteMap={mergedNoteMap}
-                                        overlayFilled={theorySettings.overlayFilled}
+                                        overlayFilled={theorySettings.layer2Filled}
                                         strings={strings}
                                         tuning={tuning}
                                         tuningIndex={tuningIndex}
+                                        fretDisplayMode={fretDisplayMode}
+                                        onToggleFretDisplay={() => setFretDisplayMode(m => m === "12" ? "24" : "12")}
                                     />
                                     </div>
 
@@ -1708,6 +1887,18 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
                 </div>
             </div>
 
+            {/* ── Video / Regular mode toggle (fixed bottom-left) ── */}
+            {videoURL && (
+                <button
+                    type="button"
+                    onClick={() => videoMode ? exitVideoMode() : enterVideoMode()}
+                    className="fixed bottom-20 left-[58px] z-50 hidden min-[900px]:flex items-center gap-2 rounded-lg border border-white/20 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.14em] transition-all hover:border-white/40 hover:text-white"
+                    style={{ fontFamily: "'Rajdhani', sans-serif", color: "rgba(255,255,255,0.80)", background: "rgba(255,255,255,0.06)", boxShadow: "0 0 10px rgba(255,255,255,0.25), 0 0 22px rgba(255,255,255,0.10)" }}
+                >
+                    {videoMode ? "Regular Mode" : "Video Mode"}
+                </button>
+            )}
+
             {/* ── Feedback button (fixed bottom-right) ── */}
             <button
                 type="button"
@@ -1804,6 +1995,22 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
                     >
                         {currentChord || "—"}
                     </div>
+                    {chordLabel && (
+                        <div className="w-full text-center" style={{
+                            fontFamily: "'Rajdhani', sans-serif",
+                            fontWeight: 700,
+                            color: chordDisplayColor || "#ffffff",
+                            opacity: 0.6,
+                            lineHeight: 1,
+                            fontSize: chordLabel.length <= 2
+                                ? "clamp(0.75rem,4vw,1.5rem)"
+                                : chordLabel.length <= 4
+                                    ? "clamp(0.5rem,2.5vw,1rem)"
+                                    : "clamp(0.4rem,1.75vw,0.6rem)",
+                        }}>
+                            {chordLabel}
+                        </div>
+                    )}
                     <div
                         className="mt-2 text-[clamp(2.4rem,12vw,5rem)] leading-none text-center"
                         style={{ color: chordDisplayColor ? `${chordDisplayColor}66` : "rgba(255,255,255,0.4)", fontFamily: "'Playfair Display', serif" }}
@@ -1815,25 +2022,6 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
 
                 {/* Fretboard — flex-1, pushed to bottom, horizontal scroll only */}
                 <div className="flex flex-col flex-1 overflow-hidden min-h-0 justify-end pb-2" data-tour="fretboard">
-                    {/* Theory preset select */}
-                    <div className="flex shrink-0 items-center px-3 pb-1" data-tour="layers-btn">
-                        <select
-                            value={theorySettings.preset}
-                            onChange={(e) => {
-                                const val = e.target.value;
-                                if (val === "custom") return;
-                                setTheorySettings((s) => applyTheoryPreset(val as TheoryPreset, s));
-                            }}
-                            className="rounded-lg border border-white/25 bg-black/60 px-2.5 py-1.5 text-[11px] font-bold uppercase tracking-[0.1em] text-white/85 outline-none"
-                            style={{ fontFamily: "'Rajdhani', sans-serif" }}
-                        >
-                            <option value="pentatonic-solo">Pentatonic Solo</option>
-                            <option value="target-notes">Target Notes</option>
-                            <option value="song-view">Song View</option>
-                            <option value="chord-only">Chord Only</option>
-                            {theorySettings.preset === "custom" && <option value="custom">Custom</option>}
-                        </select>
-                    </div>
                     <div className="overflow-x-auto overflow-y-hidden">
                         <div style={{ minWidth: "200vw" }}>
                             <Fretboard
@@ -1847,7 +2035,7 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
                                 frets={frets}
                                 getDisplayedFretboardLabel={getDisplayedFretboardLabel}
                                 mergedNoteMap={mergedNoteMap}
-                                overlayFilled={theorySettings.overlayFilled}
+                                overlayFilled={theorySettings.layer2Filled}
                                 strings={strings}
                                 tuning={tuning}
                                 tuningIndex={tuningIndex}
@@ -1906,6 +2094,7 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
                     setNoteTextColor={setNoteTextColor}
                     setPlayheadColor={setPlayheadColor}
                     setChordDisplayColor={setChordDisplayColor}
+                    onResetToDefault={resetToDefaultColors}
                 />
             </div>
 
