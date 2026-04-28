@@ -233,6 +233,16 @@ export default function Home() {
             }}
             onClick={(e) => e.stopPropagation()}
           >
+            {/* Mobile-only desktop nudge — sits at the very top of the modal */}
+            <div className="min-[900px]:hidden flex items-center gap-3 rounded-t-3xl px-5 py-3" style={{ background: "rgba(234,179,8,0.10)", borderBottom: "1px solid rgba(234,179,8,0.18)" }}>
+              <svg viewBox="0 0 24 24" width={16} height={16} fill="none" stroke="rgba(234,179,8,0.85)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
+                <rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>
+              </svg>
+              <p style={{ fontFamily: "'Courier Prime', monospace", fontSize: 11, color: "rgba(234,179,8,0.85)", letterSpacing: "0.06em", margin: 0, lineHeight: 1.4 }}>
+                <strong>JAM is built for desktop.</strong> Mobile works, but for the full experience open it on a computer.
+              </p>
+            </div>
+
             <input
               ref={tourFileRef}
               type="file"
@@ -587,8 +597,35 @@ export default function Home() {
             </Link>
           </div>
 
-          {/* Recent Tracks */}
-          <div className="flex min-h-0 flex-1 flex-col overflow-hidden" style={{ borderRadius: "16px 16px 0 0", marginTop: 39, marginLeft: -38, marginRight: -38, width: "calc(100% + 76px)" }}>
+          {/* Recent Tracks — mobile: single nav card; desktop: full list */}
+          <Link
+            href="/songs"
+            className="min-[900px]:hidden flex items-center justify-between rounded-2xl px-6 py-5 mt-5"
+            style={{
+              background: "rgba(22,18,34,0.92)",
+              border: "1px solid rgba(118,52,208,0.48)",
+              textDecoration: "none",
+            }}
+          >
+            <div className="flex items-center gap-4">
+              <div className="flex items-center justify-center rounded-xl shrink-0" style={{ width: 42, height: 42, background: "rgba(120,60,200,0.18)", border: "1px solid rgba(120,60,200,0.32)" }}>
+                <svg viewBox="0 0 24 24" width={18} height={18} fill="none" stroke="rgba(185,135,255,0.9)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M9 18V5l12-2v13" /><circle cx="6" cy="18" r="3" /><circle cx="18" cy="16" r="3" />
+                </svg>
+              </div>
+              <div>
+                <div style={{ fontFamily: "'Lora', serif", fontWeight: 700, fontSize: 17, color: "#ffffff" }}>My Tracks</div>
+                <div style={{ fontFamily: "'Courier Prime', monospace", fontSize: 11, color: "rgba(165,118,248,0.6)", letterSpacing: "0.1em", marginTop: 2 }}>
+                  {songs.length} {songs.length === 1 ? "TRACK" : "TRACKS"}
+                </div>
+              </div>
+            </div>
+            <svg viewBox="0 0 24 24" width={18} height={18} fill="none" stroke="rgba(165,118,248,0.6)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M5 12h14M12 5l7 7-7 7" />
+            </svg>
+          </Link>
+
+          <div className="hidden min-[900px]:flex min-h-0 flex-1 flex-col overflow-hidden" style={{ borderRadius: "16px 16px 0 0", marginTop: 39, marginLeft: -38, marginRight: -38, width: "calc(100% + 76px)" }}>
             {/* Header */}
             <div
               className="flex items-center justify-between px-4 pt-4 pb-3"
