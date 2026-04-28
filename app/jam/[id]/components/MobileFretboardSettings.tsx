@@ -43,6 +43,8 @@ type Props = {
     setPlayheadColor: (c: string) => void;
     setChordDisplayColor: (c: string) => void;
     onResetToDefault: () => void;
+    onStartTour: () => void;
+    onFeedback: () => void;
 };
 
 function SectionHeader({ label, open, onToggle }: { label: string; open: boolean; onToggle: () => void }) {
@@ -354,6 +356,8 @@ export default function MobileFretboardSettings({
     setPlayheadColor,
     setChordDisplayColor,
     onResetToDefault,
+    onStartTour,
+    onFeedback,
 }: Props) {
     const router = useRouter();
     const [openSection, setOpenSection] = useState<"none" | "theory" | "color" | "display">("none");
@@ -374,22 +378,42 @@ export default function MobileFretboardSettings({
                     <button type="button" onClick={onClose} className="text-lg text-white/50 transition hover:text-white">✕</button>
                 </div>
 
-                {/* Go to Menu */}
-                <button
-                    type="button"
-                    onClick={() => { onClose(); router.push("/"); }}
-                    className="mb-4 flex w-full items-center gap-3 rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-left transition hover:bg-white/10"
-                >
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-white/60">
-                        <path d="M19 12H5M12 5l-7 7 7 7" />
-                    </svg>
-                    <span className="text-[12px] font-semibold uppercase tracking-[0.18em] text-white/80" style={{ fontFamily: "'Rajdhani', sans-serif" }}>
-                        Go to Menu
-                    </span>
-                </button>
+                {/* Navigation row */}
+                <div className="mb-4 flex gap-2">
+                    <button
+                        type="button"
+                        onClick={() => { onClose(); router.push("/"); }}
+                        className="flex flex-1 items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-3 text-left transition hover:bg-white/10"
+                    >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-white/60">
+                            <path d="M19 12H5M12 5l-7 7 7 7" />
+                        </svg>
+                        <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-white/80" style={{ fontFamily: "'Rajdhani', sans-serif" }}>Home</span>
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => { onClose(); onStartTour(); }}
+                        className="flex flex-1 items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-3 text-left transition hover:bg-white/10"
+                    >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-white/60">
+                            <circle cx="12" cy="12" r="10" /><path d="M12 8v4M12 16h.01" />
+                        </svg>
+                        <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-white/80" style={{ fontFamily: "'Rajdhani', sans-serif" }}>Tour</span>
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => { onClose(); onFeedback(); }}
+                        className="flex flex-1 items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-3 text-left transition hover:bg-white/10"
+                    >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-white/60">
+                            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                        </svg>
+                        <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-white/80" style={{ fontFamily: "'Rajdhani', sans-serif" }}>Feedback</span>
+                    </button>
+                </div>
 
                 {/* Theory / Overlay */}
-                <div className="mb-3">
+                <div className="mb-3" data-tour="overlay-rows">
                     <SectionHeader label="Theory Overlays" open={openSection === "theory"} onToggle={() => toggle("theory")} />
                     {openSection === "theory" && (
                         <div className="mt-2 rounded-lg border border-white/8 bg-black/30 px-4 py-3">

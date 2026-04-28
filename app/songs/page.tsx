@@ -153,6 +153,12 @@ export default function SongsPage() {
         style={{ fontFamily: "'Lora', serif", background: "#070610" }}
       >
 
+        {/* Atmospheric background */}
+        <div className="pointer-events-none fixed inset-0 overflow-hidden">
+          <div className="absolute" style={{ width: 900, height: 500, top: -250, left: -350, background: "radial-gradient(ellipse at 36% 40%, rgba(142,28,255,0.7) 0%, rgba(112,20,235,0.4) 28%, rgba(88,15,200,0.18) 52%, transparent 70%)", filter: "blur(88px)", transform: "rotate(-25deg)" }} />
+          <div className="absolute" style={{ width: 900, height: 500, bottom: -250, right: -350, background: "radial-gradient(ellipse at 64% 60%, rgba(142,28,255,0.7) 0%, rgba(112,20,235,0.4) 28%, rgba(88,15,200,0.18) 52%, transparent 70%)", filter: "blur(88px)", transform: "rotate(-25deg)" }} />
+        </div>
+
         <div className="relative mx-auto max-w-4xl px-5 py-10 h-full flex flex-col">
 
           {/* Header */}

@@ -74,27 +74,33 @@ export default function OnboardingTour({ active, onRequestPlay }: Props) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active, done, step, isFinale]);
 
-  // Step 3: auto-open the layers dropdown and expand Custom Layers, then re-find the rect
+  // Step 3: auto-open the layers dropdown (desktop) or mobile settings sheet, then re-find the rect
   useEffect(() => {
     if (!active || done || step !== 3) return;
 
-    // Click the layers button to open the dropdown
-    const layersBtn = document.querySelector<HTMLButtonElement>('[data-tour="layers-btn"] button');
-    if (layersBtn) layersBtn.click();
+    const isMobile = window.innerWidth < 900;
 
-    // After dropdown renders, expand Custom Layers
-    const t1 = window.setTimeout(() => {
-      const expandBtn = document.querySelector<HTMLButtonElement>('[data-tour-action="expand-custom-layers"]');
-      if (expandBtn) expandBtn.click();
-    }, 150);
+    if (isMobile) {
+      // On mobile: click the hamburger settings button to open the sheet
+      const mobileBtn = document.querySelector<HTMLButtonElement>('[data-tour="layers-btn"]');
+      if (mobileBtn) mobileBtn.click();
+    } else {
+      // On desktop: click the layers button to open the dropdown
+      const layersBtn = document.querySelector<HTMLButtonElement>('[data-tour="layers-btn"] button');
+      if (layersBtn) layersBtn.click();
 
-    // After Custom Layers expands, re-find the overlay-rows rect
-    const t2 = window.setTimeout(() => findRect(), 320);
+      // After dropdown renders, expand Custom Layers
+      const t1 = window.setTimeout(() => {
+        const expandBtn = document.querySelector<HTMLButtonElement>('[data-tour-action="expand-custom-layers"]');
+        if (expandBtn) expandBtn.click();
+      }, 150);
+      window.setTimeout(() => findRect(), 320);
+      return () => window.clearTimeout(t1);
+    }
 
-    return () => {
-      window.clearTimeout(t1);
-      window.clearTimeout(t2);
-    };
+    // Re-find the overlay-rows rect after sheet/dropdown renders
+    const t2 = window.setTimeout(() => findRect(), 350);
+    return () => window.clearTimeout(t2);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active, done, step]);
 

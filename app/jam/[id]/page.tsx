@@ -1973,21 +1973,34 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
             {/* ── Mobile layout (phones only, desktop untouched above) ── */}
             <div className="flex min-[900px]:hidden h-full flex-col overflow-hidden">
 
-                {/* Settings button — absolute top right */}
-                <button
-                    type="button"
-                    onClick={() => setMobileSettingsOpen(true)}
-                    className="absolute top-4 right-4 z-30 flex h-9 w-9 flex-col items-center justify-center gap-[5px] rounded-lg border border-white/25 bg-black/40"
-                    aria-label="Settings"
-                    data-tour="layers"
-                >
-                    <span className="block h-[2px] w-4 rounded-full bg-white/75" />
-                    <span className="block h-[2px] w-4 rounded-full bg-white/75" />
-                    <span className="block h-[2px] w-4 rounded-full bg-white/75" />
-                </button>
+                {/* Mobile header — JAM logo + settings button */}
+                <div className="flex shrink-0 items-center justify-between px-4 pt-3 pb-1">
+                    <svg viewBox="0 0 540 300" xmlns="http://www.w3.org/2000/svg" className="h-auto w-[72px]" aria-label="JAM">
+                        <defs>
+                            <filter id="m-glow" x="-20%" y="-30%" width="140%" height="160%">
+                                <feGaussianBlur in="SourceGraphic" stdDeviation="10" result="blur" />
+                                <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+                            </filter>
+                        </defs>
+                        <text x="270" y="210" fontFamily="'Playfair Display', serif" fontWeight="900" fontSize={190} fill="rgba(255,255,255,0.10)" textAnchor="middle" letterSpacing={16} filter="url(#m-glow)">JAM</text>
+                        <text x="270" y="210" fontFamily="'Playfair Display', serif" fontWeight="900" fontSize={190} fill="#ffffff" textAnchor="middle" letterSpacing={16}>JAM</text>
+                    </svg>
 
-                {/* Chord display — top ~28%, pushed toward bottom of section */}
-                <div className="flex h-[28%] flex-col items-center justify-end pb-3 px-4">
+                    <button
+                        type="button"
+                        onClick={() => setMobileSettingsOpen(true)}
+                        className="flex h-9 w-9 flex-col items-center justify-center gap-[5px] rounded-lg border border-white/25 bg-black/40"
+                        aria-label="Settings"
+                        data-tour="layers-btn"
+                    >
+                        <span className="block h-[2px] w-4 rounded-full bg-white/75" />
+                        <span className="block h-[2px] w-4 rounded-full bg-white/75" />
+                        <span className="block h-[2px] w-4 rounded-full bg-white/75" />
+                    </button>
+                </div>
+
+                {/* Chord display */}
+                <div className="flex h-[26%] flex-col items-center justify-end pb-3 px-4">
                     <div data-tour="chords" className="flex flex-col items-center">
                     <div
                         className="text-[clamp(6rem,29vw,12rem)] font-bold leading-none text-center drop-shadow-[0_4px_12px_rgba(0,0,0,0.3)]"
@@ -2095,6 +2108,8 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
                     setPlayheadColor={setPlayheadColor}
                     setChordDisplayColor={setChordDisplayColor}
                     onResetToDefault={resetToDefaultColors}
+                    onStartTour={() => { setMobileSettingsOpen(false); setTourActive(true); }}
+                    onFeedback={() => { setMobileSettingsOpen(false); setFeedbackOpen(true); }}
                 />
             </div>
 
