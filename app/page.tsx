@@ -404,10 +404,10 @@ export default function Home() {
           box-shadow: 0 0 28px rgba(130,50,240,0.55), 0 0 55px rgba(130,50,240,0.25), 0 8px 24px rgba(0,0,0,0.5) !important;
         }
 
-        .upload-card {
+        .upload-card, .library-card {
           transition: transform 0.18s, box-shadow 0.18s, border-color 0.18s;
         }
-        .upload-card:hover {
+        .upload-card:hover, .library-card:hover {
           transform: translateY(-2px);
           border-color: rgba(160,100,255,0.7) !important;
           box-shadow: 0 12px 40px rgba(0,0,0,0.55), 0 0 28px rgba(120,60,200,0.28) !important;
@@ -546,36 +546,68 @@ export default function Home() {
             SEE THE MUSIC
           </p>
 
-          {/* Upload card */}
-          <input type="file" accept=".mp3,.mp4" id="fileUpload" className="hidden" onChange={handleUpload} />
-          <label
-            htmlFor="fileUpload"
-            className="upload-card cursor-pointer flex items-center gap-6 rounded-2xl px-7"
-            style={{
-              marginTop: 19,
-              height: 139,
-              background: "rgba(10,6,22,0.97)",
-              border: "1.5px solid rgba(125,55,210,0.6)",
-              boxShadow: "0 6px 32px rgba(0,0,0,0.65), 0 0 24px rgba(110,40,210,0.18)",
-            }}
-          >
-            <div style={{
-              width: 60, height: 60,
-              borderRadius: 16,
-              background: "rgba(115,45,210,0.28)",
-              border: "1.5px solid rgba(140,70,225,0.55)",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              flexShrink: 0,
-            }}>
-              <svg viewBox="0 0 24 24" width={30} height={30} fill="none" stroke="rgba(185,135,255,0.97)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 16V4" /><path d="m7 9 5-5 5 5" /><path d="M5 20h14" />
-              </svg>
-            </div>
-            <div>
-              <div style={{ fontFamily: "'Lora', serif", fontWeight: 700, fontSize: 21, color: "#ffffff" }}>Upload Track</div>
-              <div style={{ fontFamily: "'Courier Prime', monospace", fontSize: 13, color: "rgba(155,110,240,0.62)", letterSpacing: "0.08em", marginTop: 6 }}>MP3, MP4</div>
-            </div>
-          </label>
+          {/* Upload + Library buttons */}
+          <div className="flex w-full gap-4" style={{ marginTop: 19 }}>
+            <input type="file" accept=".mp3,.mp4" id="fileUpload" className="hidden" onChange={handleUpload} />
+            <label
+              htmlFor="fileUpload"
+              className="upload-card cursor-pointer flex flex-1 items-center gap-6 rounded-2xl px-7"
+              style={{
+                height: 139,
+                background: "rgba(10,6,22,0.97)",
+                border: "1.5px solid rgba(125,55,210,0.6)",
+                boxShadow: "0 6px 32px rgba(0,0,0,0.65), 0 0 24px rgba(110,40,210,0.18)",
+              }}
+            >
+              <div style={{
+                width: 60, height: 60,
+                borderRadius: 16,
+                background: "rgba(115,45,210,0.28)",
+                border: "1.5px solid rgba(140,70,225,0.55)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                flexShrink: 0,
+              }}>
+                <svg viewBox="0 0 24 24" width={30} height={30} fill="none" stroke="rgba(185,135,255,0.97)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 16V4" /><path d="m7 9 5-5 5 5" /><path d="M5 20h14" />
+                </svg>
+              </div>
+              <div>
+                <div style={{ fontFamily: "'Lora', serif", fontWeight: 700, fontSize: 21, color: "#ffffff" }}>Upload Track</div>
+                <div style={{ fontFamily: "'Courier Prime', monospace", fontSize: 13, color: "rgba(155,110,240,0.62)", letterSpacing: "0.08em", marginTop: 6 }}>MP3, MP4</div>
+              </div>
+            </label>
+
+            <Link
+              href="/library"
+              className="library-card flex flex-1 items-center gap-6 rounded-2xl px-7"
+              style={{
+                height: 139,
+                background: "rgba(10,6,22,0.97)",
+                border: "1.5px solid rgba(125,55,210,0.6)",
+                boxShadow: "0 6px 32px rgba(0,0,0,0.65), 0 0 24px rgba(110,40,210,0.18)",
+                textDecoration: "none",
+              }}
+            >
+              <div style={{
+                width: 60, height: 60,
+                borderRadius: 16,
+                background: "rgba(115,45,210,0.28)",
+                border: "1.5px solid rgba(140,70,225,0.55)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                flexShrink: 0,
+              }}>
+                <svg viewBox="0 0 24 24" width={30} height={30} fill="none" stroke="rgba(185,135,255,0.97)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M9 18V5l12-2v13" />
+                  <circle cx="6" cy="18" r="3" />
+                  <circle cx="18" cy="16" r="3" />
+                </svg>
+              </div>
+              <div>
+                <div style={{ fontFamily: "'Lora', serif", fontWeight: 700, fontSize: 21, color: "#ffffff" }}>Song Library</div>
+                <div style={{ fontFamily: "'Courier Prime', monospace", fontSize: 13, color: "rgba(155,110,240,0.62)", letterSpacing: "0.08em", marginTop: 6 }}>Community tracks</div>
+              </div>
+            </Link>
+          </div>
 
           {/* Song Demos — mobile only */}
           <div className="mt-3 flex w-full justify-center min-[900px]:hidden">

@@ -352,6 +352,8 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
     const [videoMode, setVideoMode] = useState(false);
     const [loadedFileId, setLoadedFileId] = useState("");
     const [audioError, setAudioError] = useState("");
+    const [ytImporting, setYtImporting] = useState(false);
+    const [ytImportError, setYtImportError] = useState("");
     const [isPlaying, setIsPlaying] = useState(false);
     const [currentTime, setCurrentTime] = useState(0);
     const [duration, setDuration] = useState(0);
@@ -530,6 +532,35 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
         }));
         saveSong(nextSong);
     }, [id, song]);
+
+    const handleYoutubeImport = async () => {
+        if (!song.youtubeUrl || ytImporting) return;
+        setYtImporting(true);
+        setYtImportError("");
+        try {
+            const res = await fetch("/api/extract-youtube", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ url: song.youtubeUrl }),
+            });
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({})) as { error?: string };
+                throw new Error(err.error ?? "Failed to fetch audio");
+            }
+            const blob = await res.blob();
+            const file = new File([blob], "track.mp3", { type: "audio/mpeg" });
+            await saveFile(song.fileId, file);
+            // reload the audio by briefly clearing the error state
+            setAudioError("");
+            const url = URL.createObjectURL(file);
+            setAudioURL(url);
+            setLoadedFileId(song.fileId);
+        } catch (err) {
+            setYtImportError(err instanceof Error ? err.message : "Failed to fetch audio");
+        } finally {
+            setYtImporting(false);
+        }
+    };
 
     const resetToDefaultColors = () => {
         setBgColor("#000000");
@@ -1141,6 +1172,41 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
                     ? (voxRemoval && instrumentalURL ? instrumentalURL : undefined)
                     : (voxRemoval && instrumentalURL ? instrumentalURL : (isAudioAvailable ? audioURL : undefined))
             } />
+
+            {/* YouTube import overlay — shown when song has no audio but has a YouTube URL */}
+            {visibleAudioError && song.youtubeUrl && !isAudioAvailable && (
+                <div className="absolute inset-0 z-[60] flex items-center justify-center" style={{ background: "rgba(7,6,16,0.88)", backdropFilter: "blur(12px)" }}>
+                    <div className="flex flex-col items-center gap-5 text-center px-8 max-w-md">
+                        <div style={{ color: "rgba(155,110,240,0.6)" }}>
+                            <svg viewBox="0 0 24 24" width={44} height={44} fill="currentColor">
+                                <path d="M23 7s-.3-2-1.2-2.8c-1.1-1.2-2.4-1.2-3-1.3C16.2 2.8 12 2.8 12 2.8s-4.2 0-6.8.1c-.6.1-1.9.1-3 1.3C1.3 5 1 7 1 7S.7 9.1.7 11.2v2c0 2 .3 4.1.3 4.1s.3 2 1.2 2.8c1.1 1.2 2.6 1.1 3.3 1.2C7.2 21.5 12 21.5 12 21.5s4.2 0 6.8-.2c.6-.1 1.9-.1 3-1.3.9-.8 1.2-2.8 1.2-2.8s.3-2.1.3-4.1v-2C23.3 9.1 23 7 23 7zM9.7 15.5V8.4l8.1 3.6-8.1 3.5z" />
+                            </svg>
+                        </div>
+                        <div>
+                            <div style={{ fontFamily: "'Lora', serif", fontWeight: 700, fontSize: 22, color: "#ffffff", marginBottom: 8 }}>Fetch audio from YouTube?</div>
+                            <div style={{ fontFamily: "'Courier Prime', monospace", fontSize: 12, color: "rgba(165,118,248,0.55)", letterSpacing: "0.08em", lineHeight: 1.6 }}>
+                                This song was loaded from the community library. Grab the audio to start jamming.
+                            </div>
+                        </div>
+                        {ytImportError && (
+                            <div style={{ fontFamily: "'Courier Prime', monospace", fontSize: 12, color: "rgba(255,100,100,0.8)", letterSpacing: "0.06em" }}>{ytImportError}</div>
+                        )}
+                        <div className="flex flex-col items-center gap-3 w-full">
+                            <button
+                                type="button"
+                                onClick={handleYoutubeImport}
+                                disabled={ytImporting}
+                                style={{ width: "100%", background: "rgba(10,6,22,0.97)", border: "1.5px solid rgba(130,60,220,0.65)", boxShadow: "0 0 14px rgba(110,40,210,0.5), 0 6px 20px rgba(0,0,0,0.5)", fontFamily: "'Courier Prime', monospace", fontSize: 13, fontWeight: 700, letterSpacing: "0.12em", color: "white", borderRadius: 10, padding: "12px 24px", cursor: ytImporting ? "wait" : "pointer" }}
+                            >
+                                {ytImporting ? "FETCHING AUDIO…" : "FETCH AUDIO"}
+                            </button>
+                            <div style={{ fontFamily: "'Courier Prime', monospace", fontSize: 11, color: "rgba(165,118,248,0.35)", letterSpacing: "0.1em" }}>
+                                ~20–60 SEC · SERVER PROCESSES AUDIO
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Backdrop for right customization panel */}
             {panelOpen && (

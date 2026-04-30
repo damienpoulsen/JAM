@@ -84,7 +84,7 @@ function updateStoredSong(songId: string, patch: Partial<Song>) {
   return nextSong;
 }
 
-type Phase = "checking" | "choose" | "analyzing";
+type Phase = "checking" | "choose" | "analyzing" | "done";
 type StemMode = "hpss" | "demucs";
 
 export default function PrepareJamPage({ params }: { params: Promise<{ id: string }> }) {
@@ -98,6 +98,11 @@ export default function PrepareJamPage({ params }: { params: Promise<{ id: strin
   const [stemMode, setStemMode] = useState<StemMode>("demucs");
   const [progress, setProgress] = useState(0);
   const [phaseLabel, setPhaseLabel] = useState("Loading…");
+  const [libSongName, setLibSongName] = useState("");
+  const [libArtist, setLibArtist] = useState("");
+  const [libYoutubeUrl, setLibYoutubeUrl] = useState("");
+  const [libSubmitting, setLibSubmitting] = useState(false);
+  const completedAnalysisRef = useRef<SongAnalysis | null>(null);
 
   // Phase 1: check cache / song existence — runs once on mount
   useEffect(() => {
@@ -196,7 +201,9 @@ export default function PrepareJamPage({ params }: { params: Promise<{ id: strin
           progressTimerRef.current = null;
         }
         setProgress(100);
-        router.replace(`/jam/${id}`);
+        completedAnalysisRef.current = detectedAnalysis;
+        setLibSongName(song.name || "");
+        setPhase("done");
       } catch (error) {
         if (progressTimerRef.current) {
           clearInterval(progressTimerRef.current);
@@ -271,6 +278,32 @@ export default function PrepareJamPage({ params }: { params: Promise<{ id: strin
     setPhase("choose");
   };
 
+  const handleLibrarySubmit = async () => {
+    if (!libSongName.trim() || !completedAnalysisRef.current) return;
+    setLibSubmitting(true);
+    try {
+      const song = readSongs().find((s) => s.id === id);
+      await fetch("/api/community/submit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          song_name: libSongName.trim(),
+          artist: libArtist.trim() || null,
+          youtube_url: libYoutubeUrl.trim() || null,
+          key: song?.key ?? null,
+          bpm: typeof song?.bpm === "number" ? song.bpm : null,
+          analysis_json: completedAnalysisRef.current,
+        }),
+      });
+    } catch {
+      // non-blocking — proceed even if submit fails
+    } finally {
+      router.replace(`/jam/${id}`);
+    }
+  };
+
+  const handleLibrarySkip = () => router.replace(`/jam/${id}`);
+
   return (
     <>
       <style>{`
@@ -294,6 +327,7 @@ export default function PrepareJamPage({ params }: { params: Promise<{ id: strin
           border-color: rgba(160,80,255,1) !important;
           box-shadow: 0 0 28px rgba(130,50,240,0.55), 0 0 55px rgba(130,50,240,0.25), 0 8px 24px rgba(0,0,0,0.5) !important;
         }
+        .search-input:focus { outline: none; border-color: rgba(160,100,255,0.7) !important; }
       `}</style>
 
       <main
@@ -333,7 +367,56 @@ export default function PrepareJamPage({ params }: { params: Promise<{ id: strin
         {/* ── Content ── */}
         <div className="relative mx-auto flex w-full max-w-2xl flex-1 items-center justify-center px-6">
 
-          {phase === "choose" ? (
+          {phase === "done" ? (
+            /* ── Submit to library screen ── */
+            <div className="w-full max-w-md text-center">
+              <div className="flex items-center justify-center gap-4 mb-6">
+                <div style={{ height: 1, width: 48, background: "linear-gradient(to right, transparent, rgba(120,60,200,0.55))" }} />
+                <span style={{ fontFamily: "'Courier Prime', monospace", fontSize: 11, fontWeight: 700, letterSpacing: "0.28em", color: "rgba(160,120,220,0.7)" }}>JAM</span>
+                <div style={{ height: 1, width: 48, background: "linear-gradient(to left, transparent, rgba(120,60,200,0.55))" }} />
+              </div>
+              <p style={{ fontFamily: "'Courier Prime', monospace", fontSize: 11, fontWeight: 700, letterSpacing: "0.22em", color: "rgba(165,118,248,0.55)", marginBottom: 10 }}>ANALYSIS COMPLETE</p>
+              <h1 style={{ fontFamily: "'Lora', serif", fontWeight: 700, fontSize: "clamp(20px, 3.5vw, 28px)", color: "#ffffff", margin: "0 0 8px", lineHeight: 1.2 }}>
+                Add to Song Library?
+              </h1>
+              <p style={{ fontFamily: "'Lora', serif", fontSize: 13, color: "rgba(165,118,248,0.45)", fontStyle: "italic", marginBottom: 28, lineHeight: 1.6 }}>
+                Share this analysis with the community so others can load it instantly.
+              </p>
+              <div className="flex flex-col gap-3 text-left mb-5">
+                {[
+                  { label: "SONG NAME", value: libSongName, set: setLibSongName, placeholder: "e.g. Hotel California" },
+                  { label: "ARTIST", value: libArtist, set: setLibArtist, placeholder: "e.g. Eagles" },
+                  { label: "YOUTUBE URL (OPTIONAL)", value: libYoutubeUrl, set: setLibYoutubeUrl, placeholder: "https://youtube.com/watch?v=…" },
+                ].map(({ label, value, set, placeholder }) => (
+                  <div key={label}>
+                    <label style={{ fontFamily: "'Courier Prime', monospace", fontSize: 10, letterSpacing: "0.18em", color: "rgba(165,118,248,0.55)", display: "block", marginBottom: 6 }}>{label}</label>
+                    <input
+                      className="search-input w-full rounded-lg px-4 py-2.5"
+                      style={{ background: "rgba(10,6,22,0.95)", border: "1.5px solid rgba(125,55,210,0.45)", color: "white", fontFamily: "'Lora', serif", fontSize: 14 }}
+                      value={value}
+                      onChange={(e) => set(e.target.value)}
+                      placeholder={placeholder}
+                    />
+                  </div>
+                ))}
+              </div>
+              <div className="flex flex-col items-center gap-3">
+                <button
+                  type="button"
+                  onClick={handleLibrarySubmit}
+                  disabled={!libSongName.trim() || libSubmitting}
+                  className="action-btn w-full rounded-lg px-6 py-3"
+                  style={{ background: "rgba(10,6,22,0.97)", border: "1.5px solid rgba(130,60,220,0.65)", boxShadow: "0 0 14px rgba(110,40,210,0.5), 0 6px 20px rgba(0,0,0,0.5)", fontFamily: "'Courier Prime', monospace", fontSize: 13, fontWeight: 700, letterSpacing: "0.1em", color: libSongName.trim() ? "white" : "rgba(255,255,255,0.3)", cursor: libSongName.trim() && !libSubmitting ? "pointer" : "not-allowed" }}
+                >
+                  {libSubmitting ? "SHARING…" : "SHARE WITH COMMUNITY"}
+                </button>
+                <button type="button" onClick={handleLibrarySkip} style={{ fontFamily: "'Courier Prime', monospace", fontSize: 12, color: "rgba(165,118,248,0.4)", letterSpacing: "0.1em", background: "none", border: "none", cursor: "pointer" }}>
+                  Skip — open jam
+                </button>
+              </div>
+            </div>
+
+          ) : phase === "choose" ? (
             /* ── Quality choice screen ── */
             <div className="w-full text-center">
 

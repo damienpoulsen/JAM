@@ -6,6 +6,7 @@ export type Song = {
     bpm: number | string;
     analysisStatus?: "pending" | "loading" | "ready" | "error";
     hasVideo?: boolean;
+    youtubeUrl?: string;
 };
 
 export const SONGS_STORAGE_KEY = "songs";
