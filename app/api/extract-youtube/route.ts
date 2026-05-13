@@ -47,11 +47,12 @@ async function getCookiesPath(): Promise<string | null> {
   return path;
 }
 
-// yt-dlp approach — plain flags, cookies if available, let yt-dlp choose client.
+// yt-dlp approach — android_vr client bypasses PO-token bot detection on server IPs.
 function runYtDlp(url: string, outTemplate: string, cookiesPath: string | null): Promise<void> {
   return new Promise((resolve, reject) => {
     const args = [
       "-f", "bestaudio[ext=m4a]/bestaudio",
+      "--extractor-args", "youtube:player_client=android_vr,mweb",
       "--no-warnings",
       "-o", outTemplate,
       "--no-playlist",
@@ -88,20 +89,6 @@ async function downloadViaPytubefix(url: string): Promise<{ buffer: ArrayBuffer;
   return { buffer, contentType };
 }
 
-// cobalt.tools — dedicated download service with non-blacklisted IPs.
-async function downloadViaCobalt(url: string): Promise<{ buffer: ArrayBuffer; contentType: string }> {
-  const apiRes = await fetch("https://cobalt.tools/api/json", {
-    method: "POST",
-    headers: { "Accept": "application/json", "Content-Type": "application/json" },
-    body: JSON.stringify({ url, isAudioOnly: true, aFormat: "mp3" }),
-  });
-  if (!apiRes.ok) throw new Error(`cobalt API ${apiRes.status}`);
-  const data = await apiRes.json() as { status: string; url?: string; text?: string };
-  if (data.status === "error" || !data.url) throw new Error(data.text ?? "cobalt: no download URL");
-  const audioRes = await fetch(data.url);
-  if (!audioRes.ok) throw new Error(`cobalt stream ${audioRes.status}`);
-  return { buffer: await audioRes.arrayBuffer(), contentType: "audio/mpeg" };
-}
 
 export async function POST(req: NextRequest) {
   let body: { url?: string };
@@ -161,16 +148,6 @@ export async function POST(req: NextRequest) {
     });
   } catch (pytErr) {
     process.stderr.write(`[extract-youtube] pytubefix failed: ${pytErr}\n`);
-  }
-
-  // --- Fallback 2: cobalt.tools ---
-  try {
-    const { buffer, contentType } = await downloadViaCobalt(url);
-    return new NextResponse(buffer, {
-      headers: { "Content-Type": contentType, "Content-Disposition": `attachment; filename="track.mp3"` },
-    });
-  } catch (cobaltErr) {
-    process.stderr.write(`[extract-youtube] cobalt also failed: ${cobaltErr}\n`);
   }
 
   return NextResponse.json({ error: friendlyError(ytdlpError) }, { status: 500 });
