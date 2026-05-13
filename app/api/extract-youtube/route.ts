@@ -88,6 +88,21 @@ async function downloadViaPytubefix(url: string): Promise<{ buffer: ArrayBuffer;
   return { buffer, contentType };
 }
 
+// cobalt.tools — dedicated download service with non-blacklisted IPs.
+async function downloadViaCobalt(url: string): Promise<{ buffer: ArrayBuffer; contentType: string }> {
+  const apiRes = await fetch("https://cobalt.tools/api/json", {
+    method: "POST",
+    headers: { "Accept": "application/json", "Content-Type": "application/json" },
+    body: JSON.stringify({ url, isAudioOnly: true, aFormat: "mp3" }),
+  });
+  if (!apiRes.ok) throw new Error(`cobalt API ${apiRes.status}`);
+  const data = await apiRes.json() as { status: string; url?: string; text?: string };
+  if (data.status === "error" || !data.url) throw new Error(data.text ?? "cobalt: no download URL");
+  const audioRes = await fetch(data.url);
+  if (!audioRes.ok) throw new Error(`cobalt stream ${audioRes.status}`);
+  return { buffer: await audioRes.arrayBuffer(), contentType: "audio/mpeg" };
+}
+
 export async function POST(req: NextRequest) {
   let body: { url?: string };
   try { body = await req.json(); }
@@ -137,20 +152,26 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // --- Fallback: pytubefix via analysis service ---
+  // --- Fallback 1: pytubefix via analysis service ---
   try {
     const { buffer, contentType } = await downloadViaPytubefix(url);
     const ext = contentType.includes("webm") ? "webm" : contentType.includes("mpeg") ? "mp3" : "m4a";
     return new NextResponse(buffer, {
-      headers: {
-        "Content-Type": contentType,
-        "Content-Disposition": `attachment; filename="track.${ext}"`,
-      },
+      headers: { "Content-Type": contentType, "Content-Disposition": `attachment; filename="track.${ext}"` },
     });
   } catch (pytErr) {
-    process.stderr.write(`[extract-youtube] pytubefix also failed: ${pytErr}\n`);
+    process.stderr.write(`[extract-youtube] pytubefix failed: ${pytErr}\n`);
   }
 
-  // Both failed — return the friendliest error we have.
+  // --- Fallback 2: cobalt.tools ---
+  try {
+    const { buffer, contentType } = await downloadViaCobalt(url);
+    return new NextResponse(buffer, {
+      headers: { "Content-Type": contentType, "Content-Disposition": `attachment; filename="track.mp3"` },
+    });
+  } catch (cobaltErr) {
+    process.stderr.write(`[extract-youtube] cobalt also failed: ${cobaltErr}\n`);
+  }
+
   return NextResponse.json({ error: friendlyError(ytdlpError) }, { status: 500 });
 }
