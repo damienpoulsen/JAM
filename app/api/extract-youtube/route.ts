@@ -10,7 +10,7 @@ export const maxDuration = 120;
 
 const YT_DLP = process.platform === "win32"
   ? "C:\\Users\\damie\\AppData\\Local\\Programs\\Python\\Python311\\Scripts\\yt-dlp.exe"
-  : "yt-dlp";
+  : "/opt/venv/bin/yt-dlp";
 
 const CONTENT_TYPES: Record<string, string> = {
   mp3: "audio/mpeg",
@@ -24,9 +24,11 @@ const CONTENT_TYPES: Record<string, string> = {
 function runYtDlp(url: string, outTemplate: string): Promise<void> {
   return new Promise((resolve, reject) => {
     const child = spawn(YT_DLP, [
-      // Select audio-only stream directly — no post-processing, no ffmpeg required.
       // Prefer m4a (AAC) for broad browser/Safari compatibility; fall back to best audio.
       "-f", "bestaudio[ext=m4a]/bestaudio",
+      // iOS client bypasses YouTube's server-IP bot detection on cloud hosts.
+      "--extractor-args", "youtube:player_client=ios,web_creator",
+      "--no-warnings",
       "-o", outTemplate,
       "--no-playlist",
       url,

@@ -117,7 +117,7 @@ export default function LibraryPage() {
       body: JSON.stringify({ id: song.id }),
       headers: { "Content-Type": "application/json" },
     }).catch(() => {});
-    router.push(`/jam/${id}`);
+    router.push(`/jam/${id}/prepare`);
   };
 
   const scrollToSection = (section: "popular" | "recent") => {
