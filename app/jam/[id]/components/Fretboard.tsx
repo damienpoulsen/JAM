@@ -2,6 +2,7 @@
 
 import type { MergedNote } from "@/lib/layerManager";
 import type { Layer } from "@/lib/layers";
+import type { FretVisibilityFn } from "@/lib/focusFilter";
 
 function hexLuminance(hex: string): number {
     const h = hex.replace("#", "");
@@ -42,6 +43,7 @@ type FretboardProps = {
     fretMarkers: number[];
     frets: number;
     getDisplayedFretboardLabel: (noteIndex: number) => string;
+    isFretVisible?: FretVisibilityFn;
     mergedNoteMap: Map<number, MergedNote>;
     overlayFilled: boolean;
     strings: number;
@@ -140,6 +142,7 @@ export default function Fretboard({
     fretMarkers,
     frets,
     getDisplayedFretboardLabel,
+    isFretVisible,
     mergedNoteMap,
     overlayFilled,
     strings,
@@ -178,7 +181,10 @@ export default function Fretboard({
                             {[...tuning].reverse().map((note, index) => {
                                 const stringIndex = strings - index - 1;
                                 const openNoteIndex = tuningIndex[stringIndex];
-                                const noteData = mergedNoteMap.get(openNoteIndex);
+                                const rawNoteData = mergedNoteMap.get(openNoteIndex);
+                                // Apply focus area filter to open strings (fretNum=0)
+                                const openVisible = !isFretVisible || isFretVisible(stringIndex, 0, !!rawNoteData?.baseLayer);
+                                const noteData = openVisible ? rawNoteData : undefined;
 
                                 return (
                                     <div
@@ -276,6 +282,8 @@ export default function Fretboard({
                                         const noteIndex = (tuningIndex[stringIndex] + fretIndex + 1) % 12;
                                         const noteData = mergedNoteMap.get(noteIndex);
                                         if (!noteData) return null;
+                                        // fretIndex is 0-based; actual fret number is fretIndex+1
+                                        if (isFretVisible && !isFretVisible(stringIndex, fretIndex + 1, !!noteData.baseLayer)) return null;
 
                                         return (
                                             <div

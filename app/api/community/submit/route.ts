@@ -38,8 +38,8 @@ export async function POST(req: NextRequest) {
     .single();
 
   if (error) {
-    console.error("Supabase insert error:", error);
-    return NextResponse.json({ error: "Failed to save" }, { status: 500 });
+    console.error("Supabase insert error:", JSON.stringify(error));
+    return NextResponse.json({ error: error.message ?? "Failed to save" }, { status: 500 });
   }
 
   return NextResponse.json({ id: data.id });

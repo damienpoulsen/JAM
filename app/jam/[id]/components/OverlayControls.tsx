@@ -7,8 +7,10 @@ import {
     isBaseKind,
     type TheorySettings,
     type LayerKind,
+    type FocusArea,
 } from "@/lib/layers";
 import ColorWheelPicker from "./ColorWheelPicker";
+import FocusAreaControl from "./FocusAreaControl";
 
 type NoteDisplayMode = "notes" | "intervals";
 
@@ -16,6 +18,7 @@ type OverlayControlsProps = {
     audioError: string;
     barColor: string;
     baseBpm: number | null;
+    focusArea: FocusArea;
     loopMode: boolean;
     metronomeBpm: number;
     metronomeEnabled: boolean;
@@ -25,6 +28,7 @@ type OverlayControlsProps = {
     voxRemoval: boolean;
     voxLoading: boolean;
     voxError: string;
+    onFocusAreaChange: (f: FocusArea) => void;
     onTheoryChange: (s: TheorySettings) => void;
     onDecreaseTempo: () => void;
     onIncreaseTempo: () => void;
@@ -229,10 +233,14 @@ function LayerRow({
 
 function LayersDropdown({
     settings,
+    focusArea,
     onTheoryChange,
+    onFocusAreaChange,
 }: {
     settings: TheorySettings;
+    focusArea: FocusArea;
     onTheoryChange: (s: TheorySettings) => void;
+    onFocusAreaChange: (f: FocusArea) => void;
 }) {
     const update = (patch: Partial<TheorySettings>) => onTheoryChange({ ...settings, ...patch });
 
@@ -280,6 +288,11 @@ function LayersDropdown({
                     onColorChange={(c) => update({ layer3Color: c })}
                     onIntervalChange={(n) => update({ layer3Interval: n })}
                 />
+                <FocusAreaControl
+                    focusArea={focusArea}
+                    onChange={onFocusAreaChange}
+                    layer1Kind={settings.layer1Kind}
+                />
             </div>
         </div>
     );
@@ -289,10 +302,14 @@ function LayersDropdown({
 
 function LayersButton({
     settings,
+    focusArea,
     onTheoryChange,
+    onFocusAreaChange,
 }: {
     settings: TheorySettings;
+    focusArea: FocusArea;
     onTheoryChange: (s: TheorySettings) => void;
+    onFocusAreaChange: (f: FocusArea) => void;
 }) {
     const [open, setOpen] = useState(false);
     const active = [settings.layer1Kind, settings.layer2Kind, settings.layer3Kind].filter(Boolean);
@@ -320,7 +337,9 @@ function LayersButton({
             {open && (
                 <LayersDropdown
                     settings={settings}
+                    focusArea={focusArea}
                     onTheoryChange={(s) => { onTheoryChange(s); }}
+                    onFocusAreaChange={onFocusAreaChange}
                 />
             )}
         </div>
@@ -536,6 +555,7 @@ export default function OverlayControls({
     audioError,
     barColor,
     baseBpm,
+    focusArea,
     loopMode,
     metronomeBpm,
     metronomeEnabled,
@@ -545,6 +565,7 @@ export default function OverlayControls({
     voxRemoval,
     voxLoading,
     voxError,
+    onFocusAreaChange,
     onTheoryChange,
     onDecreaseTempo,
     onIncreaseTempo,
@@ -563,7 +584,7 @@ export default function OverlayControls({
         <div className="mt-[-2px] mb-2 flex w-full justify-center">
             <div className="flex w-full max-w-[1100px] items-center justify-between gap-4 rounded-xl border-[1.5px] border-[#f4f4f5] px-6 py-2" style={{ background: barColor }}>
                 <div className="w-[32%]">
-                    <LayersButton settings={theorySettings} onTheoryChange={onTheoryChange} />
+                    <LayersButton settings={theorySettings} focusArea={focusArea} onTheoryChange={onTheoryChange} onFocusAreaChange={onFocusAreaChange} />
                 </div>
 
                 <div className="w-[30%]">

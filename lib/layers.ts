@@ -28,6 +28,26 @@ export type TheorySettings = {
     layer3Interval: number | null;
 };
 
+export type FocusAreaPatternSystem = "pentatonic" | "diatonic";
+
+export type FocusArea = {
+    patternSystem: FocusAreaPatternSystem | null;
+    activePositions: number[];
+    customFretRange: { startFret: number; endFret: number } | null;
+};
+
+export const DEFAULT_FOCUS_AREA: FocusArea = {
+    patternSystem: null,
+    activePositions: [],
+    customFretRange: null,
+};
+
+export function getFocusAreaPatternSystem(layer1Kind: LayerKind | null): FocusAreaPatternSystem | null {
+    if (layer1Kind === "key-pentatonic" || layer1Kind === "chord-pentatonic") return "pentatonic";
+    if (layer1Kind === "song-key" || layer1Kind === "chord-scale") return "diatonic";
+    return null;
+}
+
 export type LayerConfig = {
     slot: LayerSlot;
     kind: LayerKind;

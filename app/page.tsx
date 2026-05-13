@@ -34,6 +34,11 @@ export default function Home() {
   const tourFileRef = useRef<HTMLInputElement>(null);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [feedbackState, submitFeedback] = useForm("maqadgga");
+  const [uploadModalOpen, setUploadModalOpen] = useState(false);
+  const [ytUrl, setYtUrl] = useState("");
+  const [ytLoading, setYtLoading] = useState(false);
+  const [ytError, setYtError] = useState("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Inline audio preview state
   const [playingId, setPlayingId] = useState<string | null>(null);
@@ -151,6 +156,35 @@ export default function Home() {
     } catch (error) {
       console.error("Failed to save uploaded audio file", error);
     }
+    router.push(`/jam/${id}/prepare`);
+  };
+
+  const handleYoutubeUpload = async () => {
+    const url = ytUrl.trim();
+    if (!url) return;
+    if (!url.includes("youtube.com/") && !url.includes("youtu.be/")) {
+      setYtError("Please paste a valid YouTube URL.");
+      return;
+    }
+    setYtLoading(true);
+    setYtError("");
+    const id = crypto.randomUUID();
+    const pendingSong: Song = {
+      id,
+      fileId: id,
+      name: "YouTube Track",
+      key: "Unknown",
+      bpm: "--",
+      analysisStatus: "pending",
+      youtubeUrl: url,
+    };
+    const updatedSongs = [pendingSong, ...readSongs()];
+    setSongs(updatedSongs);
+    writeSongs(updatedSongs);
+    setUploadModalOpen(false);
+    setYtUrl("");
+    setYtLoading(false);
+    router.push(`/jam/${id}/prepare`);
   };
 
   const getSongHref = (song: Song) =>
@@ -546,14 +580,15 @@ export default function Home() {
             SEE THE MUSIC
           </p>
 
-          {/* Upload + Library buttons */}
-          <div className="flex w-full gap-4" style={{ marginTop: 19 }}>
-            <input type="file" accept=".mp3,.mp4" id="fileUpload" className="hidden" onChange={handleUpload} />
-            <label
-              htmlFor="fileUpload"
-              className="upload-card cursor-pointer flex flex-1 items-center gap-6 rounded-2xl px-7"
+          {/* Upload button */}
+          <div className="flex w-full justify-center" style={{ marginTop: 19 }}>
+            <input ref={fileInputRef} type="file" accept=".mp3,.mp4" className="hidden" onChange={(e) => { handleUpload(e); setUploadModalOpen(false); }} />
+            <div
+              onClick={() => setUploadModalOpen(true)}
+              className="upload-card cursor-pointer flex items-center gap-6 rounded-2xl px-7"
               style={{
                 height: 139,
+                width: "calc(50% - 8px)",
                 background: "rgba(10,6,22,0.97)",
                 border: "1.5px solid rgba(125,55,210,0.6)",
                 boxShadow: "0 6px 32px rgba(0,0,0,0.65), 0 0 24px rgba(110,40,210,0.18)",
@@ -573,40 +608,9 @@ export default function Home() {
               </div>
               <div>
                 <div style={{ fontFamily: "'Lora', serif", fontWeight: 700, fontSize: 21, color: "#ffffff" }}>Upload Track</div>
-                <div style={{ fontFamily: "'Courier Prime', monospace", fontSize: 13, color: "rgba(155,110,240,0.62)", letterSpacing: "0.08em", marginTop: 6 }}>MP3, MP4</div>
+                <div style={{ fontFamily: "'Courier Prime', monospace", fontSize: 13, color: "rgba(155,110,240,0.62)", letterSpacing: "0.08em", marginTop: 6 }}>MP3, MP4 or YouTube link</div>
               </div>
-            </label>
-
-            <Link
-              href="/library"
-              className="library-card flex flex-1 items-center gap-6 rounded-2xl px-7"
-              style={{
-                height: 139,
-                background: "rgba(10,6,22,0.97)",
-                border: "1.5px solid rgba(125,55,210,0.6)",
-                boxShadow: "0 6px 32px rgba(0,0,0,0.65), 0 0 24px rgba(110,40,210,0.18)",
-                textDecoration: "none",
-              }}
-            >
-              <div style={{
-                width: 60, height: 60,
-                borderRadius: 16,
-                background: "rgba(115,45,210,0.28)",
-                border: "1.5px solid rgba(140,70,225,0.55)",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                flexShrink: 0,
-              }}>
-                <svg viewBox="0 0 24 24" width={30} height={30} fill="none" stroke="rgba(185,135,255,0.97)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M9 18V5l12-2v13" />
-                  <circle cx="6" cy="18" r="3" />
-                  <circle cx="18" cy="16" r="3" />
-                </svg>
-              </div>
-              <div>
-                <div style={{ fontFamily: "'Lora', serif", fontWeight: 700, fontSize: 21, color: "#ffffff" }}>Song Library</div>
-                <div style={{ fontFamily: "'Courier Prime', monospace", fontSize: 13, color: "rgba(155,110,240,0.62)", letterSpacing: "0.08em", marginTop: 6 }}>Community tracks</div>
-              </div>
-            </Link>
+            </div>
           </div>
 
           {/* Song Demos — mobile only */}
@@ -829,6 +833,79 @@ export default function Home() {
             Share feedback
           </button>
         </div>
+
+        {/* Upload modal */}
+        {uploadModalOpen && (
+          <div
+            className="fixed inset-0 z-[60] flex items-center justify-center"
+            style={{ background: "rgba(0,0,0,0.72)", backdropFilter: "blur(8px)" }}
+            onClick={(e) => { if (e.target === e.currentTarget) { setUploadModalOpen(false); setYtUrl(""); setYtError(""); } }}
+          >
+            <div className="w-full max-w-sm mx-4 rounded-2xl p-7 flex flex-col gap-5" style={{ background: "rgba(10,6,22,0.98)", border: "1.5px solid rgba(125,55,210,0.55)", boxShadow: "0 24px 60px rgba(0,0,0,0.6), 0 0 40px rgba(110,40,210,0.15)" }}>
+
+              {/* Header */}
+              <div className="flex items-center justify-between">
+                <div>
+                  <div style={{ fontFamily: "'Lora', serif", fontWeight: 700, fontSize: 20, color: "#fff" }}>Upload Track</div>
+                  <div style={{ fontFamily: "'Courier Prime', monospace", fontSize: 11, letterSpacing: "0.14em", color: "rgba(165,118,248,0.5)", marginTop: 3 }}>CHOOSE HOW TO ADD</div>
+                </div>
+                <button onClick={() => { setUploadModalOpen(false); setYtUrl(""); setYtError(""); }} style={{ background: "none", border: "none", color: "rgba(165,118,248,0.45)", cursor: "pointer", padding: 4 }}>
+                  <svg viewBox="0 0 24 24" width={18} height={18} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 6 6 18M6 6l12 12" /></svg>
+                </button>
+              </div>
+
+              {/* File upload option */}
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="upload-card flex items-center gap-4 rounded-xl px-5 py-4 w-full text-left"
+                style={{ background: "rgba(115,45,210,0.12)", border: "1.5px solid rgba(125,55,210,0.5)", cursor: "pointer" }}
+              >
+                <div style={{ width: 42, height: 42, borderRadius: 12, background: "rgba(115,45,210,0.25)", border: "1px solid rgba(140,70,225,0.5)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                  <svg viewBox="0 0 24 24" width={22} height={22} fill="none" stroke="rgba(185,135,255,0.95)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M12 16V4" /><path d="m7 9 5-5 5 5" /><path d="M5 20h14" />
+                  </svg>
+                </div>
+                <div>
+                  <div style={{ fontFamily: "'Lora', serif", fontWeight: 700, fontSize: 15, color: "#fff" }}>Upload a file</div>
+                  <div style={{ fontFamily: "'Courier Prime', monospace", fontSize: 11, color: "rgba(155,110,240,0.55)", letterSpacing: "0.08em", marginTop: 2 }}>MP3, MP4</div>
+                </div>
+              </button>
+
+              {/* Divider */}
+              <div className="flex items-center gap-3">
+                <div style={{ flex: 1, height: 1, background: "rgba(125,55,210,0.25)" }} />
+                <span style={{ fontFamily: "'Courier Prime', monospace", fontSize: 10, letterSpacing: "0.18em", color: "rgba(165,118,248,0.4)" }}>OR</span>
+                <div style={{ flex: 1, height: 1, background: "rgba(125,55,210,0.25)" }} />
+              </div>
+
+              {/* YouTube URL option */}
+              <div className="flex flex-col gap-2">
+                <div style={{ fontFamily: "'Courier Prime', monospace", fontSize: 10, letterSpacing: "0.18em", color: "rgba(165,118,248,0.55)" }}>YOUTUBE URL</div>
+                <div className="flex gap-2">
+                  <input
+                    className="flex-1 rounded-lg px-3 py-2.5"
+                    style={{ background: "rgba(10,6,22,0.95)", border: "1.5px solid rgba(125,55,210,0.45)", color: "white", fontFamily: "'Lora', serif", fontSize: 14, outline: "none" }}
+                    placeholder="https://youtube.com/watch?v=…"
+                    value={ytUrl}
+                    onChange={(e) => { setYtUrl(e.target.value); setYtError(""); }}
+                    onKeyDown={(e) => { if (e.key === "Enter") handleYoutubeUpload(); }}
+                    autoComplete="off"
+                  />
+                  <button
+                    onClick={handleYoutubeUpload}
+                    disabled={ytLoading || !ytUrl.trim()}
+                    style={{ background: "rgba(115,45,210,0.35)", border: "1.5px solid rgba(140,70,225,0.55)", borderRadius: 10, padding: "0 14px", color: "white", cursor: ytUrl.trim() && !ytLoading ? "pointer" : "not-allowed", flexShrink: 0 }}
+                  >
+                    <svg viewBox="0 0 24 24" width={16} height={16} fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="m9 18 6-6-6-6" />
+                    </svg>
+                  </button>
+                </div>
+                {ytError && <div style={{ fontFamily: "'Courier Prime', monospace", fontSize: 11, color: "rgba(255,100,100,0.8)" }}>{ytError}</div>}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Feedback modal */}
         {feedbackOpen && (

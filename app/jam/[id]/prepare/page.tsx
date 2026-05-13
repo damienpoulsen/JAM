@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { use, useEffect, useRef, useState } from "react";
-import { getFile } from "../../../../lib/db";
+import { getFile, saveFile } from "../../../../lib/db";
 import {
   CURRENT_ANALYSIS_VERSION,
   readStoredSongAnalysis,
@@ -84,7 +84,7 @@ function updateStoredSong(songId: string, patch: Partial<Song>) {
   return nextSong;
 }
 
-type Phase = "checking" | "choose" | "analyzing" | "done";
+type Phase = "checking" | "fetching" | "choose" | "analyzing" | "done";
 type StemMode = "hpss" | "demucs";
 
 export default function PrepareJamPage({ params }: { params: Promise<{ id: string }> }) {
@@ -98,53 +98,107 @@ export default function PrepareJamPage({ params }: { params: Promise<{ id: strin
   const [stemMode, setStemMode] = useState<StemMode>("demucs");
   const [progress, setProgress] = useState(0);
   const [phaseLabel, setPhaseLabel] = useState("Loading…");
-  const [libSongName, setLibSongName] = useState("");
-  const [libArtist, setLibArtist] = useState("");
-  const [libYoutubeUrl, setLibYoutubeUrl] = useState("");
-  const [libSubmitting, setLibSubmitting] = useState(false);
   const completedAnalysisRef = useRef<SongAnalysis | null>(null);
 
   // Phase 1: check cache / song existence — runs once on mount
   useEffect(() => {
-    const song = readSongs().find((entry) => entry.id === id);
+    const init = async () => {
+      const song = readSongs().find((entry) => entry.id === id);
 
-    if (!song) {
-      setErrorMessage("This track could not be found.");
-      setPhase("analyzing"); // skip to analyzing phase to show error
-      return;
-    }
+      if (!song) {
+        setErrorMessage("This track could not be found.");
+        setPhase("analyzing"); // skip to analyzing phase to show error
+        return;
+      }
 
-    setSongName(song.name || "Preparing track");
+      setSongName(song.name || "Preparing track");
 
-    if (song.analysisStatus === "ready") {
-      router.replace(`/jam/${id}`);
-      return;
-    }
+      // For YouTube songs, verify the audio file actually exists before going to jam.
+      // Community-loaded songs have analysis ready but no audio in IndexedDB yet.
+      const audioMissing = async () => {
+        if (!song.youtubeUrl) return false;
+        const file = await getFile(song.fileId);
+        return !file;
+      };
 
-    const storedAnalysis = readStoredSongAnalysis(id);
-    const hasFreshStoredAnalysis =
-      Boolean(storedAnalysis) &&
-      storedAnalysis!.version >= CURRENT_ANALYSIS_VERSION &&
-      storedAnalysis!.beatStartTime !== null &&
-      (storedAnalysis!.chordEvents.length > 0 ||
-        storedAnalysis!.bpm !== null ||
-        storedAnalysis!.detectedKey !== null);
+      if (song.analysisStatus === "ready") {
+        if (await audioMissing()) { setPhase("fetching"); return; }
+        router.replace(`/jam/${id}`);
+        return;
+      }
 
-    if (hasFreshStoredAnalysis && storedAnalysis) {
-      updateStoredSong(id, {
-        key: song.key === "Unknown" && storedAnalysis.detectedKey ? storedAnalysis.detectedKey : song.key,
-        bpm: typeof storedAnalysis.bpm === "number" && Number.isFinite(storedAnalysis.bpm)
-          ? Number(storedAnalysis.bpm.toFixed(1))
-          : song.bpm,
-        analysisStatus: "ready",
-      });
-      router.replace(`/jam/${id}`);
-      return;
-    }
+      const storedAnalysis = readStoredSongAnalysis(id);
+      const hasFreshStoredAnalysis =
+        Boolean(storedAnalysis) &&
+        storedAnalysis!.version >= CURRENT_ANALYSIS_VERSION &&
+        storedAnalysis!.beatStartTime !== null &&
+        (storedAnalysis!.chordEvents.length > 0 ||
+          storedAnalysis!.bpm !== null ||
+          storedAnalysis!.detectedKey !== null);
 
-    // No cache — show the quality-choice screen
-    setPhase("choose");
+      if (hasFreshStoredAnalysis && storedAnalysis) {
+        if (await audioMissing()) { setPhase("fetching"); return; }
+        updateStoredSong(id, {
+          key: song.key === "Unknown" && storedAnalysis.detectedKey ? storedAnalysis.detectedKey : song.key,
+          bpm: typeof storedAnalysis.bpm === "number" && Number.isFinite(storedAnalysis.bpm)
+            ? Number(storedAnalysis.bpm.toFixed(1))
+            : song.bpm,
+          analysisStatus: "ready",
+        });
+        router.replace(`/jam/${id}`);
+        return;
+      }
+
+      // YouTube-sourced song — fetch audio first, then show quality choice
+      if (song.youtubeUrl) {
+        setPhase("fetching");
+        return;
+      }
+
+      // No cache — show the quality-choice screen
+      setPhase("choose");
+    };
+
+    void init();
   }, [id, router]);
+
+  // Phase 1b: fetch audio from YouTube before showing quality choice
+  useEffect(() => {
+    if (phase !== "fetching") return;
+    const song = readSongs().find((s) => s.id === id);
+    if (!song?.youtubeUrl) { setPhase("choose"); return; }
+
+    const fetchAudio = async () => {
+      try {
+        const res = await fetch("/api/extract-youtube", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ url: song.youtubeUrl }),
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({})) as { error?: string };
+          throw new Error(err.error ?? "Failed to fetch audio from YouTube");
+        }
+        const blob = await res.blob();
+        const ext = blob.type.includes("mpeg") ? "mp3" : blob.type.includes("mp4") ? "m4a" : "webm";
+        const file = new File([blob], `track.${ext}`, { type: blob.type || "audio/mp4" });
+        await saveFile(song.fileId, file);
+        setSongName((prev) => prev === "YouTube Track" || prev === "Preparing track" ? (song.name || prev) : prev);
+        // If analysis is already done (e.g. loaded from community), skip quality choice
+        const refreshed = readSongs().find((s) => s.id === id);
+        if (refreshed?.analysisStatus === "ready") {
+          router.replace(`/jam/${id}`);
+        } else {
+          setPhase("choose");
+        }
+      } catch (err) {
+        setErrorMessage(err instanceof Error ? err.message : "Failed to fetch audio from YouTube.");
+        setPhase("analyzing"); // show error screen
+      }
+    };
+
+    void fetchAudio();
+  }, [phase, id]);
 
   // Phase 2: run analysis once the user has chosen a mode
   useEffect(() => {
@@ -161,9 +215,8 @@ export default function PrepareJamPage({ params }: { params: Promise<{ id: strin
         const rawFile = await getFile(song.fileId);
         if (!rawFile) throw new Error("Audio file is unavailable for this track.");
 
-        const file = rawFile.type.startsWith("video/")
-          ? await extractAudioAsWav(rawFile)
-          : rawFile;
+        const needsTranscode = rawFile.type.startsWith("video/") || rawFile.type === "audio/mp4" || rawFile.type === "audio/webm";
+        const file = needsTranscode ? await extractAudioAsWav(rawFile) : rawFile;
 
         const formData = new FormData();
         formData.append("songId", id);
@@ -202,7 +255,6 @@ export default function PrepareJamPage({ params }: { params: Promise<{ id: strin
         }
         setProgress(100);
         completedAnalysisRef.current = detectedAnalysis;
-        setLibSongName(song.name || "");
         setPhase("done");
       } catch (error) {
         if (progressTimerRef.current) {
@@ -278,32 +330,6 @@ export default function PrepareJamPage({ params }: { params: Promise<{ id: strin
     setPhase("choose");
   };
 
-  const handleLibrarySubmit = async () => {
-    if (!libSongName.trim() || !completedAnalysisRef.current) return;
-    setLibSubmitting(true);
-    try {
-      const song = readSongs().find((s) => s.id === id);
-      await fetch("/api/community/submit", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          song_name: libSongName.trim(),
-          artist: libArtist.trim() || null,
-          youtube_url: libYoutubeUrl.trim() || null,
-          key: song?.key ?? null,
-          bpm: typeof song?.bpm === "number" ? song.bpm : null,
-          analysis_json: completedAnalysisRef.current,
-        }),
-      });
-    } catch {
-      // non-blocking — proceed even if submit fails
-    } finally {
-      router.replace(`/jam/${id}`);
-    }
-  };
-
-  const handleLibrarySkip = () => router.replace(`/jam/${id}`);
-
   return (
     <>
       <style>{`
@@ -367,8 +393,30 @@ export default function PrepareJamPage({ params }: { params: Promise<{ id: strin
         {/* ── Content ── */}
         <div className="relative mx-auto flex w-full max-w-2xl flex-1 items-center justify-center px-6">
 
-          {phase === "done" ? (
-            /* ── Submit to library screen ── */
+          {phase === "fetching" ? (
+            /* ── Fetching YouTube audio ── */
+            <div className="w-full max-w-md text-center">
+              <div className="flex items-center justify-center gap-4 mb-6">
+                <div style={{ height: 1, width: 48, background: "linear-gradient(to right, transparent, rgba(120,60,200,0.55))" }} />
+                <span style={{ fontFamily: "'Courier Prime', monospace", fontSize: 11, fontWeight: 700, letterSpacing: "0.28em", color: "rgba(160,120,220,0.7)" }}>JAM</span>
+                <div style={{ height: 1, width: 48, background: "linear-gradient(to left, transparent, rgba(120,60,200,0.55))" }} />
+              </div>
+              <div style={{ color: "rgba(155,110,240,0.5)", display: "flex", justifyContent: "center", marginBottom: 20 }}>
+                <svg viewBox="0 0 24 24" width={40} height={40} fill="currentColor">
+                  <path d="M23 7s-.3-2-1.2-2.8c-1.1-1.2-2.4-1.2-3-1.3C16.2 2.8 12 2.8 12 2.8s-4.2 0-6.8.1c-.6.1-1.9.1-3 1.3C1.3 5 1 7 1 7S.7 9.1.7 11.2v2c0 2 .3 4.1.3 4.1s.3 2 1.2 2.8c1.1 1.2 2.6 1.1 3.3 1.2C7.2 21.5 12 21.5 12 21.5s4.2 0 6.8-.2c.6-.1 1.9-.1 3-1.3.9-.8 1.2-2.8 1.2-2.8s.3-2.1.3-4.1v-2C23.3 9.1 23 7 23 7zM9.7 15.5V8.4l8.1 3.6-8.1 3.5z" />
+                </svg>
+              </div>
+              <p style={{ fontFamily: "'Courier Prime', monospace", fontSize: 11, fontWeight: 700, letterSpacing: "0.22em", color: "rgba(165,118,248,0.55)", marginBottom: 10 }}>FETCHING AUDIO</p>
+              <h1 style={{ fontFamily: "'Lora', serif", fontWeight: 700, fontSize: "clamp(20px, 3.5vw, 28px)", color: "#ffffff", margin: "0 0 12px", lineHeight: 1.2 }}>
+                Downloading from YouTube
+              </h1>
+              <p style={{ fontFamily: "'Lora', serif", fontSize: 13, color: "rgba(165,118,248,0.4)", fontStyle: "italic", lineHeight: 1.6 }}>
+                This takes 20–60 seconds. We'll go straight to analysis when it's ready.
+              </p>
+            </div>
+
+          ) : phase === "done" ? (
+            /* ── Analysis complete / community prompt ── */
             <div className="w-full max-w-md text-center">
               <div className="flex items-center justify-center gap-4 mb-6">
                 <div style={{ height: 1, width: 48, background: "linear-gradient(to right, transparent, rgba(120,60,200,0.55))" }} />
@@ -377,43 +425,22 @@ export default function PrepareJamPage({ params }: { params: Promise<{ id: strin
               </div>
               <p style={{ fontFamily: "'Courier Prime', monospace", fontSize: 11, fontWeight: 700, letterSpacing: "0.22em", color: "rgba(165,118,248,0.55)", marginBottom: 10 }}>ANALYSIS COMPLETE</p>
               <h1 style={{ fontFamily: "'Lora', serif", fontWeight: 700, fontSize: "clamp(20px, 3.5vw, 28px)", color: "#ffffff", margin: "0 0 8px", lineHeight: 1.2 }}>
-                Add to Song Library?
+                {songName}
               </h1>
-              <p style={{ fontFamily: "'Lora', serif", fontSize: 13, color: "rgba(165,118,248,0.45)", fontStyle: "italic", marginBottom: 28, lineHeight: 1.6 }}>
-                Share this analysis with the community so others can load it instantly.
-              </p>
-              <div className="flex flex-col gap-3 text-left mb-5">
-                {[
-                  { label: "SONG NAME", value: libSongName, set: setLibSongName, placeholder: "e.g. Hotel California" },
-                  { label: "ARTIST", value: libArtist, set: setLibArtist, placeholder: "e.g. Eagles" },
-                  { label: "YOUTUBE URL (OPTIONAL)", value: libYoutubeUrl, set: setLibYoutubeUrl, placeholder: "https://youtube.com/watch?v=…" },
-                ].map(({ label, value, set, placeholder }) => (
-                  <div key={label}>
-                    <label style={{ fontFamily: "'Courier Prime', monospace", fontSize: 10, letterSpacing: "0.18em", color: "rgba(165,118,248,0.55)", display: "block", marginBottom: 6 }}>{label}</label>
-                    <input
-                      className="search-input w-full rounded-lg px-4 py-2.5"
-                      style={{ background: "rgba(10,6,22,0.95)", border: "1.5px solid rgba(125,55,210,0.45)", color: "white", fontFamily: "'Lora', serif", fontSize: 14 }}
-                      value={value}
-                      onChange={(e) => set(e.target.value)}
-                      placeholder={placeholder}
-                    />
-                  </div>
-                ))}
-              </div>
-              <div className="flex flex-col items-center gap-3">
-                <button
-                  type="button"
-                  onClick={handleLibrarySubmit}
-                  disabled={!libSongName.trim() || libSubmitting}
-                  className="action-btn w-full rounded-lg px-6 py-3"
-                  style={{ background: "rgba(10,6,22,0.97)", border: "1.5px solid rgba(130,60,220,0.65)", boxShadow: "0 0 14px rgba(110,40,210,0.5), 0 6px 20px rgba(0,0,0,0.5)", fontFamily: "'Courier Prime', monospace", fontSize: 13, fontWeight: 700, letterSpacing: "0.1em", color: libSongName.trim() ? "white" : "rgba(255,255,255,0.3)", cursor: libSongName.trim() && !libSubmitting ? "pointer" : "not-allowed" }}
-                >
-                  {libSubmitting ? "SHARING…" : "SHARE WITH COMMUNITY"}
-                </button>
-                <button type="button" onClick={handleLibrarySkip} style={{ fontFamily: "'Courier Prime', monospace", fontSize: 12, color: "rgba(165,118,248,0.4)", letterSpacing: "0.1em", background: "none", border: "none", cursor: "pointer" }}>
-                  Skip — open jam
-                </button>
-              </div>
+
+              <>
+                  <p style={{ fontFamily: "'Lora', serif", fontSize: 13, color: "rgba(165,118,248,0.45)", fontStyle: "italic", marginBottom: 32, lineHeight: 1.6 }}>
+                    Chord data, BPM, and key are ready.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => router.replace(`/jam/${id}`)}
+                    className="action-btn w-full rounded-lg px-6 py-3"
+                    style={{ background: "rgba(10,6,22,0.97)", border: "1.5px solid rgba(130,60,220,0.65)", boxShadow: "0 0 14px rgba(110,40,210,0.5), 0 6px 20px rgba(0,0,0,0.5)", fontFamily: "'Courier Prime', monospace", fontSize: 13, fontWeight: 700, letterSpacing: "0.1em", color: "white", cursor: "pointer" }}
+                  >
+                    OPEN JAM →
+                  </button>
+                </>
             </div>
 
           ) : phase === "choose" ? (
