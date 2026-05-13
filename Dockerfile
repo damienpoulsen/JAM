@@ -15,7 +15,7 @@ RUN python3 -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 RUN pip install --no-cache-dir -r /app/scripts/requirements-prototype.txt \
     && pip install --no-cache-dir fastapi "uvicorn[standard]" python-multipart
-RUN pip install --no-cache-dir --upgrade yt-dlp
+RUN pip install --no-cache-dir --upgrade yt-dlp pytubefix
 
 COPY . .
 

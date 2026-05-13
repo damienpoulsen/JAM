@@ -12,6 +12,8 @@ const YT_DLP = process.platform === "win32"
   ? "C:\\Users\\damie\\AppData\\Local\\Programs\\Python\\Python311\\Scripts\\yt-dlp.exe"
   : "/opt/venv/bin/yt-dlp";
 
+const ANALYSIS_SVC = (process.env.ANALYSIS_API_URL ?? "http://localhost:8001").replace(/\/$/, "");
+
 const CONTENT_TYPES: Record<string, string> = {
   mp3: "audio/mpeg",
   m4a: "audio/mp4",
@@ -22,13 +24,13 @@ const CONTENT_TYPES: Record<string, string> = {
 };
 
 function friendlyError(raw: string): string {
-  if (/sign in|Please sign in|cookies/i.test(raw))
+  if (/sign in|Please sign in/i.test(raw))
     return "This video is restricted and can't be downloaded. Try a different song.";
   if (/private video/i.test(raw))
     return "This video is private.";
   if (/video unavailable|not available/i.test(raw))
     return "This video is unavailable.";
-  if (/age.restrict|age-restrict/i.test(raw))
+  if (/age.restrict/i.test(raw))
     return "This video is age-restricted and can't be downloaded.";
   if (/copyright/i.test(raw))
     return "This video can't be downloaded due to copyright restrictions.";
@@ -36,13 +38,8 @@ function friendlyError(raw: string): string {
 }
 
 async function getCookiesPath(): Promise<string | null> {
-  // Render Secret Files land at /etc/secrets/<filename>
   const renderPath = "/etc/secrets/yt-cookies.txt";
-  try {
-    await readFile(renderPath);
-    return renderPath;
-  } catch {}
-  // Fallback: YOUTUBE_COOKIES env var written to a temp file
+  try { await readFile(renderPath); return renderPath; } catch {}
   const cookies = process.env.YOUTUBE_COOKIES;
   if (!cookies) return null;
   const path = join(tmpdir(), "yt-cookies.txt");
@@ -50,20 +47,11 @@ async function getCookiesPath(): Promise<string | null> {
   return path;
 }
 
-// With cookies: use web (fully authenticated). Without: tv_embedded is most permissive.
-const CLIENTS_WITH_COOKIES = ["web", "ios"];
-const CLIENTS_NO_COOKIES    = ["tv_embedded", "ios", "mweb"];
-
-function runYtDlpWithClient(
-  url: string,
-  outTemplate: string,
-  cookiesPath: string | null,
-  client: string,
-): Promise<string> {
+// yt-dlp approach — plain flags, cookies if available, let yt-dlp choose client.
+function runYtDlp(url: string, outTemplate: string, cookiesPath: string | null): Promise<void> {
   return new Promise((resolve, reject) => {
     const args = [
       "-f", "bestaudio[ext=m4a]/bestaudio",
-      "--extractor-args", `youtube:player_client=${client}`,
       "--no-warnings",
       "-o", outTemplate,
       "--no-playlist",
@@ -76,30 +64,28 @@ function runYtDlpWithClient(
     child.stderr?.on("data", (chunk: Buffer) => {
       const text = chunk.toString();
       stderr += text;
-      process.stderr.write(`[yt-dlp:${client}] ${text}`);
+      process.stderr.write(`[yt-dlp] ${text}`);
     });
     child.on("error", reject);
     child.on("close", (code) => {
       if (code !== 0) reject(new Error(stderr));
-      else resolve(stderr);
+      else resolve();
     });
   });
 }
 
-async function runYtDlp(url: string, outTemplate: string, cookiesPath: string | null): Promise<void> {
-  let lastStderr = "";
-  const clients = cookiesPath ? CLIENTS_WITH_COOKIES : CLIENTS_NO_COOKIES;
-  for (const client of clients) {
-    try {
-      await runYtDlpWithClient(url, outTemplate, cookiesPath, client);
-      return;
-    } catch (err) {
-      lastStderr = err instanceof Error ? err.message : String(err);
-      // Don't retry if the video is genuinely unavailable/private — only retry auth errors.
-      if (!/sign in|Please sign in|cookies|bot/i.test(lastStderr)) break;
-    }
+// pytubefix fallback — completely different library running inside the Python analysis service.
+async function downloadViaPytubefix(url: string): Promise<{ buffer: Buffer; contentType: string }> {
+  const fd = new FormData();
+  fd.append("url", url);
+  const res = await fetch(`${ANALYSIS_SVC}/download-youtube`, { method: "POST", body: fd });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({})) as { detail?: string };
+    throw new Error(err.detail ?? "pytubefix download failed");
   }
-  throw new Error(friendlyError(lastStderr));
+  const contentType = res.headers.get("content-type") ?? "audio/mp4";
+  const buffer = Buffer.from(await res.arrayBuffer());
+  return { buffer, contentType };
 }
 
 export async function POST(req: NextRequest) {
@@ -108,18 +94,18 @@ export async function POST(req: NextRequest) {
   catch { return NextResponse.json({ error: "Invalid JSON" }, { status: 400 }); }
 
   const { url } = body;
-  if (!url || typeof url !== "string") {
+  if (!url || typeof url !== "string")
     return NextResponse.json({ error: "url is required" }, { status: 400 });
-  }
-  if (!url.includes("youtube.com/") && !url.includes("youtu.be/")) {
+  if (!url.includes("youtube.com/") && !url.includes("youtu.be/"))
     return NextResponse.json({ error: "Not a YouTube URL" }, { status: 400 });
-  }
 
   const uuid = randomUUID();
   const outBase = join(tmpdir(), `jam-yt-${uuid}`);
   const outTemplate = `${outBase}.%(ext)s`;
   const cookiesPath = await getCookiesPath().catch(() => null);
 
+  // --- Try yt-dlp first ---
+  let ytdlpError = "";
   try {
     await runYtDlp(url, outTemplate, cookiesPath);
 
@@ -127,22 +113,21 @@ export async function POST(req: NextRequest) {
     const filename = entries.find(
       (f) => f.startsWith(`jam-yt-${uuid}`) && !f.endsWith(".part") && !f.endsWith(".ytdl"),
     );
-    if (!filename) throw new Error("Couldn't extract audio from this YouTube video. Try a different link.");
-
-    const outPath = join(tmpdir(), filename);
-    const ext = filename.slice(filename.lastIndexOf(".") + 1).toLowerCase();
-    const contentType = CONTENT_TYPES[ext] ?? "audio/mpeg";
-
-    const audioBuffer = await readFile(outPath);
-    return new NextResponse(audioBuffer, {
-      headers: {
-        "Content-Type": contentType,
-        "Content-Disposition": `attachment; filename="track.${ext}"`,
-      },
-    });
+    if (filename) {
+      const outPath = join(tmpdir(), filename);
+      const ext = filename.slice(filename.lastIndexOf(".") + 1).toLowerCase();
+      const contentType = CONTENT_TYPES[ext] ?? "audio/mpeg";
+      const audioBuffer = await readFile(outPath);
+      return new NextResponse(audioBuffer, {
+        headers: {
+          "Content-Type": contentType,
+          "Content-Disposition": `attachment; filename="track.${ext}"`,
+        },
+      });
+    }
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Couldn't extract audio from this YouTube video. Try a different link.";
-    return NextResponse.json({ error: message }, { status: 500 });
+    ytdlpError = err instanceof Error ? err.message : String(err);
+    process.stderr.write(`[extract-youtube] yt-dlp failed, trying pytubefix. Error: ${ytdlpError}\n`);
   } finally {
     const entries = await readdir(tmpdir()).catch(() => [] as string[]);
     await Promise.all(
@@ -151,4 +136,21 @@ export async function POST(req: NextRequest) {
         .map((f) => unlink(join(tmpdir(), f)).catch(() => {})),
     );
   }
+
+  // --- Fallback: pytubefix via analysis service ---
+  try {
+    const { buffer, contentType } = await downloadViaPytubefix(url);
+    const ext = contentType.includes("webm") ? "webm" : contentType.includes("mpeg") ? "mp3" : "m4a";
+    return new NextResponse(buffer, {
+      headers: {
+        "Content-Type": contentType,
+        "Content-Disposition": `attachment; filename="track.${ext}"`,
+      },
+    });
+  } catch (pytErr) {
+    process.stderr.write(`[extract-youtube] pytubefix also failed: ${pytErr}\n`);
+  }
+
+  // Both failed — return the friendliest error we have.
+  return NextResponse.json({ error: friendlyError(ytdlpError) }, { status: 500 });
 }
