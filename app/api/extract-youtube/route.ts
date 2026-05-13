@@ -35,7 +35,14 @@ function friendlyError(raw: string): string {
   return "Couldn't extract audio from this YouTube video. Try a different link.";
 }
 
-async function writeCookiesFile(): Promise<string | null> {
+async function getCookiesPath(): Promise<string | null> {
+  // Render Secret Files land at /etc/secrets/<filename>
+  const renderPath = "/etc/secrets/yt-cookies.txt";
+  try {
+    await readFile(renderPath);
+    return renderPath;
+  } catch {}
+  // Fallback: YOUTUBE_COOKIES env var written to a temp file
   const cookies = process.env.YOUTUBE_COOKIES;
   if (!cookies) return null;
   const path = join(tmpdir(), "yt-cookies.txt");
@@ -110,7 +117,7 @@ export async function POST(req: NextRequest) {
   const uuid = randomUUID();
   const outBase = join(tmpdir(), `jam-yt-${uuid}`);
   const outTemplate = `${outBase}.%(ext)s`;
-  const cookiesPath = await writeCookiesFile().catch(() => null);
+  const cookiesPath = await getCookiesPath().catch(() => null);
 
   try {
     await runYtDlp(url, outTemplate, cookiesPath);
