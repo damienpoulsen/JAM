@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { readdir, readFile, unlink } from "node:fs/promises";
+import { readdir, readFile, unlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { NextRequest, NextResponse } from "next/server";
@@ -21,18 +21,42 @@ const CONTENT_TYPES: Record<string, string> = {
   aac: "audio/aac",
 };
 
-function runYtDlp(url: string, outTemplate: string): Promise<void> {
+function friendlyError(raw: string): string {
+  if (/sign in|Please sign in|cookies/i.test(raw))
+    return "This video is restricted and can't be downloaded. Try a different song.";
+  if (/private video/i.test(raw))
+    return "This video is private.";
+  if (/video unavailable|not available/i.test(raw))
+    return "This video is unavailable.";
+  if (/age.restrict|age-restrict/i.test(raw))
+    return "This video is age-restricted and can't be downloaded.";
+  if (/copyright/i.test(raw))
+    return "This video can't be downloaded due to copyright restrictions.";
+  return "Couldn't extract audio from this YouTube video. Try a different link.";
+}
+
+async function writeCookiesFile(): Promise<string | null> {
+  const cookies = process.env.YOUTUBE_COOKIES;
+  if (!cookies) return null;
+  const path = join(tmpdir(), "yt-cookies.txt");
+  await writeFile(path, cookies, "utf8");
+  return path;
+}
+
+function runYtDlp(url: string, outTemplate: string, cookiesPath: string | null): Promise<void> {
   return new Promise((resolve, reject) => {
-    const child = spawn(YT_DLP, [
-      // Prefer m4a (AAC) for broad browser/Safari compatibility; fall back to best audio.
+    const args = [
       "-f", "bestaudio[ext=m4a]/bestaudio",
-      // iOS client bypasses YouTube's server-IP bot detection on cloud hosts.
-      "--extractor-args", "youtube:player_client=ios,web_creator",
+      // tv_embedded is the most permissive client — works without sign-in for most public videos.
+      "--extractor-args", "youtube:player_client=tv_embedded,ios",
       "--no-warnings",
       "-o", outTemplate,
       "--no-playlist",
-      url,
-    ], { stdio: ["ignore", "pipe", "pipe"] });
+    ];
+    if (cookiesPath) args.push("--cookies", cookiesPath);
+    args.push(url);
+
+    const child = spawn(YT_DLP, args, { stdio: ["ignore", "pipe", "pipe"] });
     let stderr = "";
     child.stderr?.on("data", (chunk: Buffer) => {
       const text = chunk.toString();
@@ -41,7 +65,7 @@ function runYtDlp(url: string, outTemplate: string): Promise<void> {
     });
     child.on("error", reject);
     child.on("close", (code) => {
-      if (code !== 0) reject(new Error(stderr || `yt-dlp exited with code ${code}`));
+      if (code !== 0) reject(new Error(friendlyError(stderr)));
       else resolve();
     });
   });
@@ -62,21 +86,19 @@ export async function POST(req: NextRequest) {
 
   const uuid = randomUUID();
   const outBase = join(tmpdir(), `jam-yt-${uuid}`);
-  // %(ext)s in the template lets yt-dlp append the actual format extension.
   const outTemplate = `${outBase}.%(ext)s`;
+  const cookiesPath = await writeCookiesFile().catch(() => null);
 
-  let outPath: string | null = null;
   try {
-    await runYtDlp(url, outTemplate);
+    await runYtDlp(url, outTemplate, cookiesPath);
 
-    // Locate the file yt-dlp wrote (it appends the real extension).
     const entries = await readdir(tmpdir());
     const filename = entries.find(
       (f) => f.startsWith(`jam-yt-${uuid}`) && !f.endsWith(".part") && !f.endsWith(".ytdl"),
     );
-    if (!filename) throw new Error("yt-dlp did not produce an output file");
+    if (!filename) throw new Error("Couldn't extract audio from this YouTube video. Try a different link.");
 
-    outPath = join(tmpdir(), filename);
+    const outPath = join(tmpdir(), filename);
     const ext = filename.slice(filename.lastIndexOf(".") + 1).toLowerCase();
     const contentType = CONTENT_TYPES[ext] ?? "audio/mpeg";
 
@@ -88,10 +110,9 @@ export async function POST(req: NextRequest) {
       },
     });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Failed to extract audio";
+    const message = err instanceof Error ? err.message : "Couldn't extract audio from this YouTube video.";
     return NextResponse.json({ error: message }, { status: 500 });
   } finally {
-    // Clean up the output file and any leftover temp files for this uuid.
     const entries = await readdir(tmpdir()).catch(() => [] as string[]);
     await Promise.all(
       entries
