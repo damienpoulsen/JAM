@@ -43,12 +43,20 @@ async function writeCookiesFile(): Promise<string | null> {
   return path;
 }
 
-function runYtDlp(url: string, outTemplate: string, cookiesPath: string | null): Promise<void> {
+// Client types to try in order — tv_embedded is most permissive without auth,
+// ios as fallback. With cookies, the first attempt usually succeeds.
+const PLAYER_CLIENTS = ["tv_embedded", "ios", "mweb"];
+
+function runYtDlpWithClient(
+  url: string,
+  outTemplate: string,
+  cookiesPath: string | null,
+  client: string,
+): Promise<string> {
   return new Promise((resolve, reject) => {
     const args = [
       "-f", "bestaudio[ext=m4a]/bestaudio",
-      // tv_embedded is the most permissive client — works without sign-in for most public videos.
-      "--extractor-args", "youtube:player_client=tv_embedded,ios",
+      "--extractor-args", `youtube:player_client=${client}`,
       "--no-warnings",
       "-o", outTemplate,
       "--no-playlist",
@@ -61,14 +69,29 @@ function runYtDlp(url: string, outTemplate: string, cookiesPath: string | null):
     child.stderr?.on("data", (chunk: Buffer) => {
       const text = chunk.toString();
       stderr += text;
-      process.stderr.write(`[yt-dlp] ${text}`);
+      process.stderr.write(`[yt-dlp:${client}] ${text}`);
     });
     child.on("error", reject);
     child.on("close", (code) => {
-      if (code !== 0) reject(new Error(friendlyError(stderr)));
-      else resolve();
+      if (code !== 0) reject(new Error(stderr));
+      else resolve(stderr);
     });
   });
+}
+
+async function runYtDlp(url: string, outTemplate: string, cookiesPath: string | null): Promise<void> {
+  let lastStderr = "";
+  for (const client of PLAYER_CLIENTS) {
+    try {
+      await runYtDlpWithClient(url, outTemplate, cookiesPath, client);
+      return;
+    } catch (err) {
+      lastStderr = err instanceof Error ? err.message : String(err);
+      // Don't retry if the video is genuinely unavailable/private — only retry auth errors.
+      if (!/sign in|Please sign in|cookies|bot/i.test(lastStderr)) break;
+    }
+  }
+  throw new Error(friendlyError(lastStderr));
 }
 
 export async function POST(req: NextRequest) {
@@ -110,7 +133,7 @@ export async function POST(req: NextRequest) {
       },
     });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Couldn't extract audio from this YouTube video.";
+    const message = err instanceof Error ? err.message : "Couldn't extract audio from this YouTube video. Try a different link.";
     return NextResponse.json({ error: message }, { status: 500 });
   } finally {
     const entries = await readdir(tmpdir()).catch(() => [] as string[]);
