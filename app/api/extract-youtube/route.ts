@@ -34,7 +34,11 @@ function runYtDlp(url: string, outTemplate: string): Promise<void> {
       url,
     ], { stdio: ["ignore", "pipe", "pipe"] });
     let stderr = "";
-    child.stderr?.on("data", (chunk: Buffer) => { stderr += chunk.toString(); });
+    child.stderr?.on("data", (chunk: Buffer) => {
+      const text = chunk.toString();
+      stderr += text;
+      process.stderr.write(`[yt-dlp] ${text}`);
+    });
     child.on("error", reject);
     child.on("close", (code) => {
       if (code !== 0) reject(new Error(stderr || `yt-dlp exited with code ${code}`));

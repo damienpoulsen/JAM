@@ -84,7 +84,7 @@ function updateStoredSong(songId: string, patch: Partial<Song>) {
   return nextSong;
 }
 
-type Phase = "checking" | "fetching" | "choose" | "analyzing" | "done";
+type Phase = "checking" | "fetching" | "choose" | "analyzing" | "done" | "error";
 type StemMode = "hpss" | "demucs";
 
 export default function PrepareJamPage({ params }: { params: Promise<{ id: string }> }) {
@@ -193,7 +193,7 @@ export default function PrepareJamPage({ params }: { params: Promise<{ id: strin
         }
       } catch (err) {
         setErrorMessage(err instanceof Error ? err.message : "Failed to fetch audio from YouTube.");
-        setPhase("analyzing"); // show error screen
+        setPhase("error");
       }
     };
 
@@ -327,7 +327,8 @@ export default function PrepareJamPage({ params }: { params: Promise<{ id: strin
     setErrorMessage("");
     hasAnalyzedRef.current = false;
     updateStoredSong(id, { analysisStatus: "pending" });
-    setPhase("choose");
+    const song = readSongs().find((s) => s.id === id);
+    setPhase(song?.youtubeUrl ? "fetching" : "choose");
   };
 
   return (
@@ -541,7 +542,7 @@ export default function PrepareJamPage({ params }: { params: Promise<{ id: strin
               </div>
 
               <p style={{ fontFamily: "'Courier Prime', monospace", fontSize: 11, fontWeight: 700, letterSpacing: "0.22em", color: "rgba(165,118,248,0.55)", marginBottom: 10 }}>
-                {errorMessage ? "ERROR" : phase === "checking" ? "LOADING" : "ANALYZING"}
+                {errorMessage || phase === "error" ? "ERROR" : phase === "checking" ? "LOADING" : "ANALYZING"}
               </p>
               <h1 style={{ fontFamily: "'Lora', serif", fontWeight: 700, fontSize: "clamp(20px, 3.5vw, 30px)", color: "#ffffff", margin: "0 0 24px", lineHeight: 1.2 }}>
                 {songName}
