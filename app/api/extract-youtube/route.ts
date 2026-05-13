@@ -50,9 +50,9 @@ async function getCookiesPath(): Promise<string | null> {
   return path;
 }
 
-// Client types to try in order — tv_embedded is most permissive without auth,
-// ios as fallback. With cookies, the first attempt usually succeeds.
-const PLAYER_CLIENTS = ["tv_embedded", "ios", "mweb"];
+// With cookies: use web (fully authenticated). Without: tv_embedded is most permissive.
+const CLIENTS_WITH_COOKIES = ["web", "ios"];
+const CLIENTS_NO_COOKIES    = ["tv_embedded", "ios", "mweb"];
 
 function runYtDlpWithClient(
   url: string,
@@ -88,7 +88,8 @@ function runYtDlpWithClient(
 
 async function runYtDlp(url: string, outTemplate: string, cookiesPath: string | null): Promise<void> {
   let lastStderr = "";
-  for (const client of PLAYER_CLIENTS) {
+  const clients = cookiesPath ? CLIENTS_WITH_COOKIES : CLIENTS_NO_COOKIES;
+  for (const client of clients) {
     try {
       await runYtDlpWithClient(url, outTemplate, cookiesPath, client);
       return;
