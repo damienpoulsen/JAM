@@ -75,7 +75,7 @@ function runYtDlp(url: string, outTemplate: string, cookiesPath: string | null):
 }
 
 // pytubefix fallback — completely different library running inside the Python analysis service.
-async function downloadViaPytubefix(url: string): Promise<{ buffer: Buffer; contentType: string }> {
+async function downloadViaPytubefix(url: string): Promise<{ buffer: ArrayBuffer; contentType: string }> {
   const fd = new FormData();
   fd.append("url", url);
   const res = await fetch(`${ANALYSIS_SVC}/download-youtube`, { method: "POST", body: fd });
@@ -84,7 +84,7 @@ async function downloadViaPytubefix(url: string): Promise<{ buffer: Buffer; cont
     throw new Error(err.detail ?? "pytubefix download failed");
   }
   const contentType = res.headers.get("content-type") ?? "audio/mp4";
-  const buffer = Buffer.from(await res.arrayBuffer());
+  const buffer = await res.arrayBuffer();
   return { buffer, contentType };
 }
 
