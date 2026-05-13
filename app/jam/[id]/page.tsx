@@ -16,10 +16,13 @@ import {
     buildLayer,
     theorySettingsToLayerConfigs,
     DEFAULT_THEORY,
+    DEFAULT_FOCUS_AREA,
     type TheorySettings,
+    type FocusArea,
     type Layer,
 } from "@/lib/layers";
 import { mergeLayers } from "../../../lib/layerManager";
+import { buildFretVisibilityFn } from "@/lib/focusFilter";
 import { getSongAnalysis, type AnalysisChordEvent } from "../../../lib/analysis";
 import { getFile, saveFile } from "../../../lib/db";
 import { readSongs, SONGS_STORAGE_KEY, type Song, writeSongs } from "../../../lib/songs";
@@ -397,6 +400,7 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
     const [feedbackState, submitFeedback] = useForm("maqadgga");
     const [keyOpen, setKeyOpen] = useState(false);
     const [theorySettings, setTheorySettings] = useState<TheorySettings>(() => readTheorySettings(id));
+    const [focusArea, setFocusArea] = useState<FocusArea>(DEFAULT_FOCUS_AREA);
     const [loopMode, setLoopMode] = useState(false);
     const [loopRange, setLoopRange] = useState<LoopRange | null>(null);
     const [loopDraft, setLoopDraft] = useState<LoopRange | null>(null);
@@ -479,6 +483,12 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
         () => new Map(mergedNotes.map((mergedNote) => [mergedNote.note, mergedNote])),
         [mergedNotes]
     );
+    // Focus area filter — tuningIndex values are always [4,9,2,7,11,4] (EADGBE) so safe to omit from deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    const isFretVisible = useMemo(
+        () => buildFretVisibilityFn(focusArea, theorySettings.layer1Kind, song.key, effectiveChord, tuningIndex),
+        [focusArea, theorySettings.layer1Kind, song.key, effectiveChord],
+    );
     const displayReferenceNoteIndex = useMemo(
         () => getDisplayReferenceNoteIndex(currentChord, song.key),
         [currentChord, song.key]
@@ -548,7 +558,8 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
                 throw new Error(err.error ?? "Failed to fetch audio");
             }
             const blob = await res.blob();
-            const file = new File([blob], "track.mp3", { type: "audio/mpeg" });
+            const ext = blob.type.includes("mpeg") ? "mp3" : blob.type.includes("mp4") ? "m4a" : "webm";
+            const file = new File([blob], `track.${ext}`, { type: blob.type || "audio/mp4" });
             await saveFile(song.fileId, file);
             // reload the audio by briefly clearing the error state
             setAudioError("");
@@ -1719,7 +1730,9 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
                                         <OverlayControls
                                             barColor={controlCenterColor}
                                             audioError={visibleAudioError}
+                                            focusArea={focusArea}
                                             theorySettings={theorySettings}
+                                            onFocusAreaChange={setFocusArea}
                                             onTheoryChange={setTheorySettings}
                                             loopMode={loopMode}
                                             metronomeBpm={metronomeBpm}
@@ -1769,6 +1782,7 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
                                         fretMarkers={fretMarkers}
                                         frets={frets}
                                         getDisplayedFretboardLabel={getDisplayedFretboardLabel}
+                                        isFretVisible={isFretVisible}
                                         mergedNoteMap={mergedNoteMap}
                                         overlayFilled={theorySettings.layer2Filled}
                                         strings={strings}
@@ -2113,6 +2127,7 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
                                 fretMarkers={fretMarkers}
                                 frets={frets}
                                 getDisplayedFretboardLabel={getDisplayedFretboardLabel}
+                                isFretVisible={isFretVisible}
                                 mergedNoteMap={mergedNoteMap}
                                 overlayFilled={theorySettings.layer2Filled}
                                 strings={strings}
