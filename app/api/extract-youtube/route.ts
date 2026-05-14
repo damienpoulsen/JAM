@@ -47,14 +47,12 @@ async function getCookiesPath(): Promise<string | null> {
   return path;
 }
 
-// yt-dlp approach — android_vr/mweb clients don't require PO tokens on server IPs.
-// Cookies are intentionally omitted: android_vr is an anonymous TV client and passing
-// browser session cookies alongside it confuses YouTube's bot detection.
+// yt-dlp with bgutil PO-token provider — bgutil runs on localhost:4416 and the
+// bgutil-ytdlp-pot-provider pip plugin tells yt-dlp to fetch tokens from it automatically.
 function runYtDlp(url: string, outTemplate: string, _cookiesPath: string | null): Promise<void> {
   return new Promise((resolve, reject) => {
     const args = [
       "-f", "bestaudio[ext=m4a]/bestaudio",
-      "--extractor-args", "youtube:player_client=android_vr,mweb",
       "--no-warnings",
       "-o", outTemplate,
       "--no-playlist",
