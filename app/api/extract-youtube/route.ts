@@ -47,8 +47,10 @@ async function getCookiesPath(): Promise<string | null> {
   return path;
 }
 
-// yt-dlp approach — android_vr client bypasses PO-token bot detection on server IPs.
-function runYtDlp(url: string, outTemplate: string, cookiesPath: string | null): Promise<void> {
+// yt-dlp approach — android_vr/mweb clients don't require PO tokens on server IPs.
+// Cookies are intentionally omitted: android_vr is an anonymous TV client and passing
+// browser session cookies alongside it confuses YouTube's bot detection.
+function runYtDlp(url: string, outTemplate: string, _cookiesPath: string | null): Promise<void> {
   return new Promise((resolve, reject) => {
     const args = [
       "-f", "bestaudio[ext=m4a]/bestaudio",
@@ -57,7 +59,6 @@ function runYtDlp(url: string, outTemplate: string, cookiesPath: string | null):
       "-o", outTemplate,
       "--no-playlist",
     ];
-    if (cookiesPath) args.push("--cookies", cookiesPath);
     args.push(url);
 
     const child = spawn(YT_DLP, args, { stdio: ["ignore", "pipe", "pipe"] });
