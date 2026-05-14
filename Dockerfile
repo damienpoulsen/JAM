@@ -9,7 +9,7 @@ RUN apt-get update \
 
 # Build the bgutil PO-token server (Node.js) — generates YouTube proof-of-origin tokens
 # that yt-dlp needs to download from server/datacenter IPs.
-RUN git clone --depth=1 --branch 1.3.1 \
+RUN git clone --depth=1 \
       https://github.com/Brainicism/bgutil-ytdlp-pot-provider.git /opt/bgutil \
     && cd /opt/bgutil/server \
     && npm ci \
@@ -42,6 +42,9 @@ EXPOSE 10000
 CMD ["sh", "-c", "\
   node /opt/bgutil/server/build/main.js & \
   uvicorn app:app --app-dir /app/analysis-service --host 0.0.0.0 --port 8001 --workers 1 & \
+  echo 'Waiting for bgutil...' && \
+  until curl -sf http://localhost:4416/ping > /dev/null 2>&1; do sleep 2; done && \
+  echo 'bgutil ready' && \
   echo 'Waiting for analysis service...' && \
   until curl -sf http://localhost:8001/health > /dev/null 2>&1; do sleep 2; done && \
   echo 'Analysis service ready' && \

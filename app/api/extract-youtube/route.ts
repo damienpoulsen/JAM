@@ -47,9 +47,10 @@ async function getCookiesPath(): Promise<string | null> {
   return path;
 }
 
-// yt-dlp with bgutil PO-token provider — bgutil runs on localhost:4416 and the
-// bgutil-ytdlp-pot-provider pip plugin tells yt-dlp to fetch tokens from it automatically.
-function runYtDlp(url: string, outTemplate: string, _cookiesPath: string | null): Promise<void> {
+// yt-dlp: uses bgutil PO-token plugin automatically on Linux (Docker/Render).
+// On Windows local dev, pulls cookies from Firefox since bgutil isn't running.
+// If YOUTUBE_COOKIES env var is set, writes them to a temp file and passes via --cookies.
+function runYtDlp(url: string, outTemplate: string, cookiesPath: string | null): Promise<void> {
   return new Promise((resolve, reject) => {
     const args = [
       "-f", "bestaudio[ext=m4a]/bestaudio",
@@ -57,6 +58,11 @@ function runYtDlp(url: string, outTemplate: string, _cookiesPath: string | null)
       "-o", outTemplate,
       "--no-playlist",
     ];
+    if (cookiesPath) {
+      args.push("--cookies", cookiesPath);
+    } else if (process.platform === "win32") {
+      args.push("--cookies-from-browser", "firefox");
+    }
     args.push(url);
 
     const child = spawn(YT_DLP, args, { stdio: ["ignore", "pipe", "pipe"] });
