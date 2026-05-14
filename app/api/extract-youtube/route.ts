@@ -57,6 +57,7 @@ function runYtDlp(url: string, outTemplate: string, cookiesPath: string | null):
       "--no-warnings",
       "-o", outTemplate,
       "--no-playlist",
+      "--extractor-args", "youtube:player_client=android_vr,android,web",
     ];
     if (cookiesPath) {
       args.push("--cookies", cookiesPath);
