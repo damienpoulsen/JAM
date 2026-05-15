@@ -6,7 +6,7 @@ import { join } from "node:path";
 
 export const dynamic = "force-dynamic";
 
-async function runRemoteExtraction(file: File): Promise<Buffer> {
+async function runRemoteExtraction(file: File): Promise<ArrayBuffer> {
     const analysisApiUrl = process.env.ANALYSIS_API_URL;
     if (!analysisApiUrl) throw new Error("Missing ANALYSIS_API_URL");
 
@@ -30,7 +30,7 @@ async function runRemoteExtraction(file: File): Promise<Buffer> {
         throw new Error(message);
     }
 
-    return Buffer.from(await response.arrayBuffer());
+    return response.arrayBuffer();
 }
 
 async function runLocalExtraction(inputPath: string, outputPath: string): Promise<void> {
