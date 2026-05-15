@@ -6,7 +6,34 @@ import { join } from "node:path";
 
 export const dynamic = "force-dynamic";
 
-async function runExtraction(inputPath: string, outputPath: string): Promise<void> {
+async function runRemoteExtraction(file: File): Promise<Buffer> {
+    const analysisApiUrl = process.env.ANALYSIS_API_URL;
+    if (!analysisApiUrl) throw new Error("Missing ANALYSIS_API_URL");
+
+    const formData = new FormData();
+    const ext = file.name.includes(".") ? file.name.slice(file.name.lastIndexOf(".")) : ".mp3";
+    formData.append("file", file, file.name || `track${ext}`);
+
+    const response = await fetch(`${analysisApiUrl.replace(/\/$/, "")}/extract-stems`, {
+        method: "POST",
+        body: formData,
+    });
+
+    if (!response.ok) {
+        let message = "Stem extraction failed";
+        try {
+            const payload = (await response.json()) as { detail?: string; error?: string };
+            message = payload.detail || payload.error || message;
+        } catch {
+            // keep fallback message
+        }
+        throw new Error(message);
+    }
+
+    return Buffer.from(await response.arrayBuffer());
+}
+
+async function runLocalExtraction(inputPath: string, outputPath: string): Promise<void> {
     const scriptPath = join(process.cwd(), "scripts", "analyze_song.py");
     const args = [
         scriptPath,
@@ -52,27 +79,34 @@ export async function POST(request: Request) {
         return Response.json({ error: "Missing audio file" }, { status: 400 });
     }
 
-    const ext = file.name.includes(".") ? file.name.slice(file.name.lastIndexOf(".")) : ".mp3";
-    const inputPath = join(tmpdir(), `jam-stems-in-${randomUUID()}${ext}`);
-    const outputPath = join(tmpdir(), `jam-stems-out-${randomUUID()}.wav`);
-
     try {
-        const arrayBuffer = await file.arrayBuffer();
-        await writeFile(inputPath, new Uint8Array(arrayBuffer));
+        if (process.env.ANALYSIS_API_URL) {
+            const wavData = await runRemoteExtraction(file);
+            return new Response(wavData, {
+                headers: { "Content-Type": "audio/wav" },
+            });
+        }
 
-        await runExtraction(inputPath, outputPath);
+        const ext = file.name.includes(".") ? file.name.slice(file.name.lastIndexOf(".")) : ".mp3";
+        const inputPath = join(tmpdir(), `jam-stems-in-${randomUUID()}${ext}`);
+        const outputPath = join(tmpdir(), `jam-stems-out-${randomUUID()}.wav`);
 
-        const wavData = await readFile(outputPath);
-        return new Response(wavData, {
-            headers: { "Content-Type": "audio/wav" },
-        });
+        try {
+            const arrayBuffer = await file.arrayBuffer();
+            await writeFile(inputPath, new Uint8Array(arrayBuffer));
+            await runLocalExtraction(inputPath, outputPath);
+            const wavData = await readFile(outputPath);
+            return new Response(wavData, {
+                headers: { "Content-Type": "audio/wav" },
+            });
+        } finally {
+            await Promise.all([
+                unlink(inputPath).catch(() => undefined),
+                unlink(outputPath).catch(() => undefined),
+            ]);
+        }
     } catch (error) {
         const message = error instanceof Error ? error.message : "Stem extraction failed";
         return Response.json({ error: message }, { status: 500 });
-    } finally {
-        await Promise.all([
-            unlink(inputPath).catch(() => undefined),
-            unlink(outputPath).catch(() => undefined),
-        ]);
     }
 }

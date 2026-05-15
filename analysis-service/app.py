@@ -21,6 +21,7 @@ from analyze_song import (  # noqa: E402
     CURRENT_ANALYSIS_VERSION,
     analyze_bpm_and_beats,
     detect_chord_events,
+    extract_instrumental,
     snap_chord_events_to_beats,
 )
 
@@ -88,6 +89,34 @@ async def analyze(
                 "version": CURRENT_ANALYSIS_VERSION,
             }
         )
+    except Exception as error:
+        raise HTTPException(status_code=500, detail=str(error)) from error
+    finally:
+        try:
+            file.file.close()
+        except Exception:
+            pass
+        shutil.rmtree(temp_dir, ignore_errors=True)
+        gc.collect()
+
+
+@app.post("/extract-stems")
+async def extract_stems_endpoint(file: UploadFile = File(...)):
+    suffix = Path(file.filename or "track.mp3").suffix or ".mp3"
+    temp_dir = Path(tempfile.mkdtemp(prefix="jam-stems-"))
+    input_path = temp_dir / f"upload{suffix}"
+    output_path = temp_dir / "instrumental.wav"
+
+    try:
+        with input_path.open("wb") as destination:
+            shutil.copyfileobj(file.file, destination)
+
+        extract_instrumental(input_path, output_path)
+
+        with output_path.open("rb") as f:
+            wav_data = f.read()
+
+        return Response(content=wav_data, media_type="audio/wav")
     except Exception as error:
         raise HTTPException(status_code=500, detail=str(error)) from error
     finally:
