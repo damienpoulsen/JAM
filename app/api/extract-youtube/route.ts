@@ -14,6 +14,13 @@ const YT_DLP = process.platform === "win32"
 
 const ANALYSIS_SVC = (process.env.ANALYSIS_API_URL ?? "http://localhost:8001").replace(/\/$/, "");
 
+// Piped instances to try in order. Piped proxies streams through their own servers,
+// bypassing YouTube's datacenter IP blocks entirely.
+const PIPED_INSTANCES = [
+  "https://pipedapi.kavin.rocks",
+  "https://pipedapi.adminforge.de",
+];
+
 const CONTENT_TYPES: Record<string, string> = {
   mp3: "audio/mpeg",
   m4a: "audio/mp4",
@@ -37,39 +44,57 @@ function friendlyError(raw: string): string {
   return "Couldn't extract audio from this YouTube video. Try a different link.";
 }
 
-// cobalt.tools handles YouTube auth on their own servers — bypasses Render IP blocks.
-// COBALT_API_URL: defaults to api.cobalt.tools (set to a community instance if needed)
-// COBALT_API_KEY: optional, include if the instance requires one
-async function downloadViaCobalt(url: string): Promise<{ buffer: ArrayBuffer; contentType: string }> {
-  const apiUrl = (process.env.COBALT_API_URL ?? "https://api.cobalt.tools/").replace(/\/$/, "") + "/";
-  const apiKey = process.env.COBALT_API_KEY;
-
-  const headers: Record<string, string> = {
-    "Accept": "application/json",
-    "Content-Type": "application/json",
-  };
-  if (apiKey) headers["Authorization"] = `Api-Key ${apiKey}`;
-
-  const res = await fetch(apiUrl, {
-    method: "POST",
-    headers,
-    body: JSON.stringify({ url, downloadMode: "audio" }),
-  });
-
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({})) as { error?: { code?: string } };
-    throw new Error(`cobalt API error ${res.status}: ${err.error?.code ?? "unknown"}`);
+function extractVideoId(url: string): string | null {
+  const patterns = [
+    /[?&]v=([a-zA-Z0-9_-]{11})/,
+    /youtu\.be\/([a-zA-Z0-9_-]{11})/,
+    /\/embed\/([a-zA-Z0-9_-]{11})/,
+  ];
+  for (const p of patterns) {
+    const m = url.match(p);
+    if (m) return m[1];
   }
+  return null;
+}
 
-  const data = await res.json() as { status: string; url?: string };
-  if (!data.url) throw new Error(`cobalt returned status=${data.status} with no URL`);
+// Piped is a YouTube proxy — streams route through their servers, not ours.
+// No API key needed. Tries multiple instances for resilience.
+async function downloadViaPiped(url: string): Promise<{ buffer: ArrayBuffer; contentType: string }> {
+  const videoId = extractVideoId(url);
+  if (!videoId) throw new Error("Could not extract video ID from URL");
 
-  const audioRes = await fetch(data.url);
-  if (!audioRes.ok) throw new Error(`cobalt audio fetch failed: ${audioRes.status}`);
+  let lastErr = "";
+  for (const instance of PIPED_INSTANCES) {
+    try {
+      const metaRes = await fetch(`${instance}/streams/${videoId}`, {
+        headers: { "Accept": "application/json" },
+        signal: AbortSignal.timeout(10000),
+      });
+      if (!metaRes.ok) { lastErr = `${instance} metadata ${metaRes.status}`; continue; }
 
-  const buffer = await audioRes.arrayBuffer();
-  const contentType = audioRes.headers.get("content-type") ?? "audio/mp4";
-  return { buffer, contentType };
+      const meta = await metaRes.json() as {
+        audioStreams?: Array<{ url: string; mimeType: string; bitrate: number }>;
+        error?: string;
+      };
+      if (meta.error) { lastErr = meta.error; continue; }
+
+      const streams = meta.audioStreams ?? [];
+      if (!streams.length) { lastErr = "no audio streams"; continue; }
+
+      const best = streams.sort((a, b) => b.bitrate - a.bitrate)[0];
+      process.stderr.write(`[extract-youtube] piped: using ${instance}, mimeType=${best.mimeType}\n`);
+
+      const audioRes = await fetch(best.url, { signal: AbortSignal.timeout(60000) });
+      if (!audioRes.ok) { lastErr = `audio fetch ${audioRes.status}`; continue; }
+
+      const buffer = await audioRes.arrayBuffer();
+      const contentType = best.mimeType?.split(";")[0] ?? "audio/webm";
+      return { buffer, contentType };
+    } catch (e) {
+      lastErr = String(e);
+    }
+  }
+  throw new Error(`All Piped instances failed: ${lastErr}`);
 }
 
 function runYtDlp(url: string, outTemplate: string): Promise<void> {
@@ -125,20 +150,18 @@ export async function POST(req: NextRequest) {
   if (!url.includes("youtube.com/") && !url.includes("youtu.be/"))
     return NextResponse.json({ error: "Not a YouTube URL" }, { status: 400 });
 
-  // --- Try cobalt first (works from server IPs, yt-dlp/pytubefix are blocked by YouTube) ---
-  {
-    try {
-      const { buffer, contentType } = await downloadViaCobalt(url);
-      const ext = contentType.includes("webm") ? "webm" : contentType.includes("mpeg") ? "mp3" : "m4a";
-      return new NextResponse(buffer, {
-        headers: { "Content-Type": contentType, "Content-Disposition": `attachment; filename="track.${ext}"` },
-      });
-    } catch (cobaltErr) {
-      process.stderr.write(`[extract-youtube] cobalt failed: ${cobaltErr}\n`);
-    }
+  // --- Try Piped first (proxies streams through their servers, no Render IP block) ---
+  try {
+    const { buffer, contentType } = await downloadViaPiped(url);
+    const ext = contentType.includes("webm") ? "webm" : contentType.includes("mpeg") ? "mp3" : "m4a";
+    return new NextResponse(buffer, {
+      headers: { "Content-Type": contentType, "Content-Disposition": `attachment; filename="track.${ext}"` },
+    });
+  } catch (pipedErr) {
+    process.stderr.write(`[extract-youtube] piped failed: ${pipedErr}\n`);
   }
 
-  // --- Fallback: yt-dlp (works locally, blocked on Render without cookies) ---
+  // --- Fallback: yt-dlp (works locally, blocked on Render) ---
   const uuid = randomUUID();
   const outBase = join(tmpdir(), `jam-yt-${uuid}`);
   const outTemplate = `${outBase}.%(ext)s`;
