@@ -38,18 +38,21 @@ function friendlyError(raw: string): string {
 }
 
 // cobalt.tools handles YouTube auth on their own servers — bypasses Render IP blocks.
-// Requires COBALT_API_KEY env var. Returns audio buffer on success.
+// COBALT_API_URL: defaults to api.cobalt.tools (set to a community instance if needed)
+// COBALT_API_KEY: optional, include if the instance requires one
 async function downloadViaCobalt(url: string): Promise<{ buffer: ArrayBuffer; contentType: string }> {
+  const apiUrl = (process.env.COBALT_API_URL ?? "https://api.cobalt.tools/").replace(/\/$/, "") + "/";
   const apiKey = process.env.COBALT_API_KEY;
-  if (!apiKey) throw new Error("COBALT_API_KEY not set");
 
-  const res = await fetch("https://api.cobalt.tools/", {
+  const headers: Record<string, string> = {
+    "Accept": "application/json",
+    "Content-Type": "application/json",
+  };
+  if (apiKey) headers["Authorization"] = `Api-Key ${apiKey}`;
+
+  const res = await fetch(apiUrl, {
     method: "POST",
-    headers: {
-      "Accept": "application/json",
-      "Content-Type": "application/json",
-      "Authorization": `Api-Key ${apiKey}`,
-    },
+    headers,
     body: JSON.stringify({ url, downloadMode: "audio" }),
   });
 
@@ -123,7 +126,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Not a YouTube URL" }, { status: 400 });
 
   // --- Try cobalt first (works from server IPs, yt-dlp/pytubefix are blocked by YouTube) ---
-  if (process.env.COBALT_API_KEY) {
+  {
     try {
       const { buffer, contentType } = await downloadViaCobalt(url);
       const ext = contentType.includes("webm") ? "webm" : contentType.includes("mpeg") ? "mp3" : "m4a";
