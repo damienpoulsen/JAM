@@ -37,9 +37,38 @@ function friendlyError(raw: string): string {
   return "Couldn't extract audio from this YouTube video. Try a different link.";
 }
 
-// On Linux/Render: bgutil PO-token plugin is installed and auto-discovered by yt-dlp.
-// No player_client override — let bgutil pick the right client and provide tokens.
-// On Windows local dev: falls back to Firefox cookies since bgutil isn't running.
+// cobalt.tools handles YouTube auth on their own servers — bypasses Render IP blocks.
+// Requires COBALT_API_KEY env var. Returns audio buffer on success.
+async function downloadViaCobalt(url: string): Promise<{ buffer: ArrayBuffer; contentType: string }> {
+  const apiKey = process.env.COBALT_API_KEY;
+  if (!apiKey) throw new Error("COBALT_API_KEY not set");
+
+  const res = await fetch("https://api.cobalt.tools/", {
+    method: "POST",
+    headers: {
+      "Accept": "application/json",
+      "Content-Type": "application/json",
+      "Authorization": `Api-Key ${apiKey}`,
+    },
+    body: JSON.stringify({ url, downloadMode: "audio" }),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({})) as { error?: { code?: string } };
+    throw new Error(`cobalt API error ${res.status}: ${err.error?.code ?? "unknown"}`);
+  }
+
+  const data = await res.json() as { status: string; url?: string };
+  if (!data.url) throw new Error(`cobalt returned status=${data.status} with no URL`);
+
+  const audioRes = await fetch(data.url);
+  if (!audioRes.ok) throw new Error(`cobalt audio fetch failed: ${audioRes.status}`);
+
+  const buffer = await audioRes.arrayBuffer();
+  const contentType = audioRes.headers.get("content-type") ?? "audio/mp4";
+  return { buffer, contentType };
+}
+
 function runYtDlp(url: string, outTemplate: string): Promise<void> {
   return new Promise((resolve, reject) => {
     const args = [
@@ -68,7 +97,6 @@ function runYtDlp(url: string, outTemplate: string): Promise<void> {
   });
 }
 
-// pytubefix fallback — completely different library running inside the Python analysis service.
 async function downloadViaPytubefix(url: string): Promise<{ buffer: ArrayBuffer; contentType: string }> {
   const fd = new FormData();
   fd.append("url", url);
@@ -94,15 +122,26 @@ export async function POST(req: NextRequest) {
   if (!url.includes("youtube.com/") && !url.includes("youtu.be/"))
     return NextResponse.json({ error: "Not a YouTube URL" }, { status: 400 });
 
+  // --- Try cobalt first (works from server IPs, yt-dlp/pytubefix are blocked by YouTube) ---
+  if (process.env.COBALT_API_KEY) {
+    try {
+      const { buffer, contentType } = await downloadViaCobalt(url);
+      const ext = contentType.includes("webm") ? "webm" : contentType.includes("mpeg") ? "mp3" : "m4a";
+      return new NextResponse(buffer, {
+        headers: { "Content-Type": contentType, "Content-Disposition": `attachment; filename="track.${ext}"` },
+      });
+    } catch (cobaltErr) {
+      process.stderr.write(`[extract-youtube] cobalt failed: ${cobaltErr}\n`);
+    }
+  }
+
+  // --- Fallback: yt-dlp (works locally, blocked on Render without cookies) ---
   const uuid = randomUUID();
   const outBase = join(tmpdir(), `jam-yt-${uuid}`);
   const outTemplate = `${outBase}.%(ext)s`;
-
-  // --- Try yt-dlp first ---
   let ytdlpError = "";
   try {
     await runYtDlp(url, outTemplate);
-
     const entries = await readdir(tmpdir());
     const filename = entries.find(
       (f) => f.startsWith(`jam-yt-${uuid}`) && !f.endsWith(".part") && !f.endsWith(".ytdl"),
@@ -121,7 +160,7 @@ export async function POST(req: NextRequest) {
     }
   } catch (err) {
     ytdlpError = err instanceof Error ? err.message : String(err);
-    process.stderr.write(`[extract-youtube] yt-dlp failed, trying pytubefix. Error: ${ytdlpError}\n`);
+    process.stderr.write(`[extract-youtube] yt-dlp failed: ${ytdlpError}\n`);
   } finally {
     const entries = await readdir(tmpdir()).catch(() => [] as string[]);
     await Promise.all(
@@ -131,7 +170,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // --- Fallback: pytubefix via analysis service ---
+  // --- Last resort: pytubefix ---
   try {
     const { buffer, contentType } = await downloadViaPytubefix(url);
     const ext = contentType.includes("webm") ? "webm" : contentType.includes("mpeg") ? "mp3" : "m4a";
