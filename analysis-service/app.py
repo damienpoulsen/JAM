@@ -73,6 +73,7 @@ async def analyze(
         chord_events, detected_key = detect_chord_events(
             audio_path=temp_path,
             detect_chords=should_detect_chords,
+            stem_mode="hpss",
         )
 
         if chord_events and len(beat_times) >= 2 and bpm is not None:

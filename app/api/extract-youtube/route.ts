@@ -117,6 +117,7 @@ export async function POST(req: NextRequest) {
   const outBase = join(tmpdir(), `jam-yt-${uuid}`);
   const outTemplate = `${outBase}.%(ext)s`;
   const cookiesPath = await getCookiesPath(uuid).catch(() => null);
+  process.stderr.write(`[extract-youtube] cookiesPath=${cookiesPath ?? "none"}\n`);
 
   // --- Try yt-dlp first ---
   let ytdlpError = "";
