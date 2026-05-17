@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { copyFile, readdir, readFile, unlink, writeFile } from "node:fs/promises";
+import { readdir, readFile, unlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { NextRequest, NextResponse } from "next/server";
@@ -37,37 +37,18 @@ function friendlyError(raw: string): string {
   return "Couldn't extract audio from this YouTube video. Try a different link.";
 }
 
-async function getCookiesPath(uuid: string): Promise<string | null> {
-  const tmpPath = join(tmpdir(), `yt-cookies-${uuid}.txt`);
-  const renderPath = "/etc/secrets/yt-cookies.txt";
-  try {
-    await readFile(renderPath);
-    await copyFile(renderPath, tmpPath);
-    return tmpPath;
-  } catch {}
-  const cookies = process.env.YOUTUBE_COOKIES;
-  if (!cookies) return null;
-  await writeFile(tmpPath, cookies, "utf8");
-  return tmpPath;
-}
-
-// yt-dlp: uses bgutil PO-token plugin automatically on Linux (Docker/Render).
-// On Windows local dev, pulls cookies from Firefox since bgutil isn't running.
-// If YOUTUBE_COOKIES env var is set, writes them to a temp file and passes via --cookies.
-function runYtDlp(url: string, outTemplate: string, cookiesPath: string | null): Promise<void> {
+// On Linux/Render: bgutil PO-token plugin is installed and auto-discovered by yt-dlp.
+// No player_client override — let bgutil pick the right client and provide tokens.
+// On Windows local dev: falls back to Firefox cookies since bgutil isn't running.
+function runYtDlp(url: string, outTemplate: string): Promise<void> {
   return new Promise((resolve, reject) => {
-    // web client uses cookies for auth; android_vr bypasses bot detection without cookies
-    const playerClients = cookiesPath ? "web,android,android_vr" : "android_vr,android,web";
     const args = [
       "-f", "bestaudio[ext=m4a]/bestaudio",
       "--no-warnings",
       "-o", outTemplate,
       "--no-playlist",
-      "--extractor-args", `youtube:player_client=${playerClients}`,
     ];
-    if (cookiesPath) {
-      args.push("--cookies", cookiesPath);
-    } else if (process.platform === "win32") {
+    if (process.platform === "win32") {
       args.push("--cookies-from-browser", "firefox");
     }
     args.push(url);
@@ -116,13 +97,11 @@ export async function POST(req: NextRequest) {
   const uuid = randomUUID();
   const outBase = join(tmpdir(), `jam-yt-${uuid}`);
   const outTemplate = `${outBase}.%(ext)s`;
-  const cookiesPath = await getCookiesPath(uuid).catch(() => null);
-  process.stderr.write(`[extract-youtube] cookiesPath=${cookiesPath ?? "none"}\n`);
 
   // --- Try yt-dlp first ---
   let ytdlpError = "";
   try {
-    await runYtDlp(url, outTemplate, cookiesPath);
+    await runYtDlp(url, outTemplate);
 
     const entries = await readdir(tmpdir());
     const filename = entries.find(
@@ -147,12 +126,12 @@ export async function POST(req: NextRequest) {
     const entries = await readdir(tmpdir()).catch(() => [] as string[]);
     await Promise.all(
       entries
-        .filter((f) => f.startsWith(`jam-yt-${uuid}`) || f === `yt-cookies-${uuid}.txt`)
+        .filter((f) => f.startsWith(`jam-yt-${uuid}`))
         .map((f) => unlink(join(tmpdir(), f)).catch(() => {})),
     );
   }
 
-  // --- Fallback 1: pytubefix via analysis service ---
+  // --- Fallback: pytubefix via analysis service ---
   try {
     const { buffer, contentType } = await downloadViaPytubefix(url);
     const ext = contentType.includes("webm") ? "webm" : contentType.includes("mpeg") ? "mp3" : "m4a";
