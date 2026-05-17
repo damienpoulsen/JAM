@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { readdir, readFile, unlink, writeFile } from "node:fs/promises";
+import { copyFile, readdir, readFile, unlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { NextRequest, NextResponse } from "next/server";
@@ -37,14 +37,18 @@ function friendlyError(raw: string): string {
   return "Couldn't extract audio from this YouTube video. Try a different link.";
 }
 
-async function getCookiesPath(): Promise<string | null> {
+async function getCookiesPath(uuid: string): Promise<string | null> {
+  const tmpPath = join(tmpdir(), `yt-cookies-${uuid}.txt`);
   const renderPath = "/etc/secrets/yt-cookies.txt";
-  try { await readFile(renderPath); return renderPath; } catch {}
+  try {
+    await readFile(renderPath);
+    await copyFile(renderPath, tmpPath);
+    return tmpPath;
+  } catch {}
   const cookies = process.env.YOUTUBE_COOKIES;
   if (!cookies) return null;
-  const path = join(tmpdir(), "yt-cookies.txt");
-  await writeFile(path, cookies, "utf8");
-  return path;
+  await writeFile(tmpPath, cookies, "utf8");
+  return tmpPath;
 }
 
 // yt-dlp: uses bgutil PO-token plugin automatically on Linux (Docker/Render).
@@ -52,12 +56,14 @@ async function getCookiesPath(): Promise<string | null> {
 // If YOUTUBE_COOKIES env var is set, writes them to a temp file and passes via --cookies.
 function runYtDlp(url: string, outTemplate: string, cookiesPath: string | null): Promise<void> {
   return new Promise((resolve, reject) => {
+    // web client uses cookies for auth; android_vr bypasses bot detection without cookies
+    const playerClients = cookiesPath ? "web,android,android_vr" : "android_vr,android,web";
     const args = [
       "-f", "bestaudio[ext=m4a]/bestaudio",
       "--no-warnings",
       "-o", outTemplate,
       "--no-playlist",
-      "--extractor-args", "youtube:player_client=android_vr,android,web",
+      "--extractor-args", `youtube:player_client=${playerClients}`,
     ];
     if (cookiesPath) {
       args.push("--cookies", cookiesPath);
@@ -110,7 +116,7 @@ export async function POST(req: NextRequest) {
   const uuid = randomUUID();
   const outBase = join(tmpdir(), `jam-yt-${uuid}`);
   const outTemplate = `${outBase}.%(ext)s`;
-  const cookiesPath = await getCookiesPath().catch(() => null);
+  const cookiesPath = await getCookiesPath(uuid).catch(() => null);
 
   // --- Try yt-dlp first ---
   let ytdlpError = "";
@@ -140,7 +146,7 @@ export async function POST(req: NextRequest) {
     const entries = await readdir(tmpdir()).catch(() => [] as string[]);
     await Promise.all(
       entries
-        .filter((f) => f.startsWith(`jam-yt-${uuid}`))
+        .filter((f) => f.startsWith(`jam-yt-${uuid}`) || f === `yt-cookies-${uuid}.txt`)
         .map((f) => unlink(join(tmpdir(), f)).catch(() => {})),
     );
   }

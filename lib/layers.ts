@@ -115,10 +115,10 @@ export const LAYER_GROUPS: ReadonlyArray<{
     {
         label: "BASE LAYERS",
         options: [
-            { value: "song-key",         label: "Diatonic Scale" },
-            { value: "chord-pentatonic", label: "Chord Pentatonics" },
             { value: "key-pentatonic",   label: "Key Pentatonic" },
-            { value: "chord-scale",      label: "Chord Scale" },
+            { value: "chord-pentatonic", label: "Chord Pentatonics" },
+            { value: "song-key",         label: "Key Diatonic" },
+            { value: "chord-scale",      label: "Chord Diatonic" },
         ],
     },
     {
@@ -388,7 +388,7 @@ export function buildLayer(config: LayerConfig, context: LayerContext): Layer | 
             break;
         case "chord-scale":
             notes = getChordScale(context.currentChord, context.songKey);
-            label = "Chord Scale";
+            label = "Chord Diatonic";
             break;
         case "root-notes":
             notes = rootPitch ? [rootPitch.noteIndex] : [];
