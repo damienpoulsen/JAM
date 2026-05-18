@@ -38,6 +38,22 @@ export default function Home() {
   const [ytUrl, setYtUrl] = useState("");
   const [ytLoading, setYtLoading] = useState(false);
   const [ytError, setYtError] = useState("");
+
+  const YT_LIMIT = 5;
+  const getYtUsage = () => {
+    try {
+      const raw = localStorage.getItem("jam-yt-usage");
+      if (!raw) return { count: 0, month: "" };
+      return JSON.parse(raw) as { count: number; month: string };
+    } catch { return { count: 0, month: "" }; }
+  };
+  const ytUsage = (() => {
+    const now = new Date();
+    const month = `${now.getFullYear()}-${now.getMonth()}`;
+    const stored = getYtUsage();
+    return stored.month === month ? stored.count : 0;
+  })();
+  const ytRemaining = Math.max(0, YT_LIMIT - ytUsage);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Inline audio preview state
@@ -166,6 +182,14 @@ export default function Home() {
       setYtError("Please paste a valid YouTube URL.");
       return;
     }
+    const now = new Date();
+    const month = `${now.getFullYear()}-${now.getMonth()}`;
+    const stored = getYtUsage();
+    const currentCount = stored.month === month ? stored.count : 0;
+    if (currentCount >= YT_LIMIT) {
+      setYtError("You've used all 5 YouTube imports for this month. Resets on the 1st.");
+      return;
+    }
     setYtLoading(true);
     setYtError("");
     let videoTitle = "YouTube Track";
@@ -186,6 +210,7 @@ export default function Home() {
       analysisStatus: "pending",
       youtubeUrl: url,
     };
+    localStorage.setItem("jam-yt-usage", JSON.stringify({ count: currentCount + 1, month }));
     const updatedSongs = [pendingSong, ...readSongs()];
     setSongs(updatedSongs);
     writeSongs(updatedSongs);
@@ -888,21 +913,27 @@ export default function Home() {
 
               {/* YouTube URL option */}
               <div className="flex flex-col gap-2">
-                <div style={{ fontFamily: "'Courier Prime', monospace", fontSize: 10, letterSpacing: "0.18em", color: "rgba(165,118,248,0.55)" }}>YOUTUBE URL</div>
+                <div className="flex items-center justify-between">
+                  <div style={{ fontFamily: "'Courier Prime', monospace", fontSize: 10, letterSpacing: "0.18em", color: "rgba(165,118,248,0.55)" }}>YOUTUBE URL</div>
+                  <div style={{ fontFamily: "'Courier Prime', monospace", fontSize: 9, letterSpacing: "0.12em", color: ytRemaining === 0 ? "rgba(255,100,100,0.7)" : "rgba(165,118,248,0.4)" }}>
+                    {ytRemaining}/{YT_LIMIT} IMPORTS LEFT THIS MONTH
+                  </div>
+                </div>
                 <div className="flex gap-2">
                   <input
                     className="flex-1 rounded-lg px-3 py-2.5"
-                    style={{ background: "rgba(10,6,22,0.95)", border: "1.5px solid rgba(125,55,210,0.45)", color: "white", fontFamily: "'Lora', serif", fontSize: 14, outline: "none" }}
-                    placeholder="https://youtube.com/watch?v=…"
+                    style={{ background: "rgba(10,6,22,0.95)", border: "1.5px solid rgba(125,55,210,0.45)", color: "white", fontFamily: "'Lora', serif", fontSize: 14, outline: "none", opacity: ytRemaining === 0 ? 0.4 : 1 }}
+                    placeholder={ytRemaining === 0 ? "Monthly limit reached" : "https://youtube.com/watch?v=…"}
                     value={ytUrl}
+                    disabled={ytRemaining === 0}
                     onChange={(e) => { setYtUrl(e.target.value); setYtError(""); }}
                     onKeyDown={(e) => { if (e.key === "Enter") handleYoutubeUpload(); }}
                     autoComplete="off"
                   />
                   <button
                     onClick={handleYoutubeUpload}
-                    disabled={ytLoading || !ytUrl.trim()}
-                    style={{ background: "rgba(115,45,210,0.35)", border: "1.5px solid rgba(140,70,225,0.55)", borderRadius: 10, padding: "0 14px", color: "white", cursor: ytUrl.trim() && !ytLoading ? "pointer" : "not-allowed", flexShrink: 0 }}
+                    disabled={ytLoading || !ytUrl.trim() || ytRemaining === 0}
+                    style={{ background: "rgba(115,45,210,0.35)", border: "1.5px solid rgba(140,70,225,0.55)", borderRadius: 10, padding: "0 14px", color: "white", cursor: ytUrl.trim() && !ytLoading && ytRemaining > 0 ? "pointer" : "not-allowed", flexShrink: 0 }}
                   >
                     <svg viewBox="0 0 24 24" width={16} height={16} fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                       <path d="m9 18 6-6-6-6" />
