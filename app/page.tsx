@@ -608,7 +608,7 @@ export default function Home() {
               </div>
               <div>
                 <div style={{ fontFamily: "'Lora', serif", fontWeight: 700, fontSize: 21, color: "#ffffff" }}>Upload Track</div>
-                <div style={{ fontFamily: "'Courier Prime', monospace", fontSize: 13, color: "rgba(155,110,240,0.62)", letterSpacing: "0.08em", marginTop: 6 }}>MP3 or MP4</div>
+                <div style={{ fontFamily: "'Courier Prime', monospace", fontSize: 13, color: "rgba(155,110,240,0.62)", letterSpacing: "0.08em", marginTop: 6 }}>MP3, MP4 or YouTube link</div>
               </div>
             </div>
           </div>
@@ -867,7 +867,7 @@ export default function Home() {
                 </div>
                 <div>
                   <div style={{ fontFamily: "'Lora', serif", fontWeight: 700, fontSize: 15, color: "#fff" }}>Upload a file</div>
-                  <div style={{ fontFamily: "'Courier Prime', monospace", fontSize: 11, color: "rgba(155,110,240,0.55)", letterSpacing: "0.08em", marginTop: 2 }}>MP3, MP4</div>
+                  <div style={{ fontFamily: "'Courier Prime', monospace", fontSize: 11, color: "rgba(155,110,240,0.55)", letterSpacing: "0.08em", marginTop: 2 }}>MP3, MP4 or YouTube</div>
                 </div>
               </button>
 
@@ -878,15 +878,30 @@ export default function Home() {
                 <div style={{ flex: 1, height: 1, background: "rgba(125,55,210,0.25)" }} />
               </div>
 
-              {/* YouTube URL — coming soon */}
+              {/* YouTube URL option */}
               <div className="flex flex-col gap-2">
-                <div className="flex items-center gap-2">
-                  <div style={{ fontFamily: "'Courier Prime', monospace", fontSize: 10, letterSpacing: "0.18em", color: "rgba(165,118,248,0.55)" }}>YOUTUBE URL</div>
-                  <div style={{ fontFamily: "'Courier Prime', monospace", fontSize: 9, letterSpacing: "0.14em", color: "rgba(185,135,255,0.5)", background: "rgba(115,45,210,0.15)", border: "1px solid rgba(140,70,225,0.3)", borderRadius: 4, padding: "1px 6px" }}>COMING SOON</div>
+                <div style={{ fontFamily: "'Courier Prime', monospace", fontSize: 10, letterSpacing: "0.18em", color: "rgba(165,118,248,0.55)" }}>YOUTUBE URL</div>
+                <div className="flex gap-2">
+                  <input
+                    className="flex-1 rounded-lg px-3 py-2.5"
+                    style={{ background: "rgba(10,6,22,0.95)", border: "1.5px solid rgba(125,55,210,0.45)", color: "white", fontFamily: "'Lora', serif", fontSize: 14, outline: "none" }}
+                    placeholder="https://youtube.com/watch?v=…"
+                    value={ytUrl}
+                    onChange={(e) => { setYtUrl(e.target.value); setYtError(""); }}
+                    onKeyDown={(e) => { if (e.key === "Enter") handleYoutubeUpload(); }}
+                    autoComplete="off"
+                  />
+                  <button
+                    onClick={handleYoutubeUpload}
+                    disabled={ytLoading || !ytUrl.trim()}
+                    style={{ background: "rgba(115,45,210,0.35)", border: "1.5px solid rgba(140,70,225,0.55)", borderRadius: 10, padding: "0 14px", color: "white", cursor: ytUrl.trim() && !ytLoading ? "pointer" : "not-allowed", flexShrink: 0 }}
+                  >
+                    <svg viewBox="0 0 24 24" width={16} height={16} fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="m9 18 6-6-6-6" />
+                    </svg>
+                  </button>
                 </div>
-                <div style={{ fontFamily: "'Lora', serif", fontSize: 13, color: "rgba(155,110,240,0.45)", padding: "10px 12px", borderRadius: 10, border: "1.5px dashed rgba(125,55,210,0.25)", background: "rgba(10,6,22,0.5)" }}>
-                  YouTube import is coming soon
-                </div>
+                {ytError && <div style={{ fontFamily: "'Courier Prime', monospace", fontSize: 11, color: "rgba(255,100,100,0.8)" }}>{ytError}</div>}
               </div>
             </div>
           </div>

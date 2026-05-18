@@ -57,6 +57,39 @@ function extractVideoId(url: string): string | null {
   return null;
 }
 
+async function downloadViaRapidAPI(url: string): Promise<{ buffer: ArrayBuffer; contentType: string }> {
+  const apiKey = process.env.RAPIDAPI_KEY;
+  if (!apiKey) throw new Error("RAPIDAPI_KEY not set");
+
+  const videoId = extractVideoId(url);
+  if (!videoId) throw new Error("Could not extract video ID from URL");
+
+  const metaRes = await fetch("https://youtube-mp3-2025.p.rapidapi.com/v1/social/youtube/audio", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-rapidapi-host": "youtube-mp3-2025.p.rapidapi.com",
+      "x-rapidapi-key": apiKey,
+    },
+    body: JSON.stringify({ id: videoId }),
+    signal: AbortSignal.timeout(30000),
+  });
+
+  if (!metaRes.ok) throw new Error(`RapidAPI status ${metaRes.status}`);
+
+  const meta = await metaRes.json() as { link?: string; url?: string; audio?: string; error?: string };
+  if (meta.error) throw new Error(meta.error);
+
+  const downloadUrl = meta.link ?? meta.url ?? meta.audio;
+  if (!downloadUrl) throw new Error(`No download URL in response: ${JSON.stringify(meta)}`);
+
+  const audioRes = await fetch(downloadUrl, { signal: AbortSignal.timeout(60000) });
+  if (!audioRes.ok) throw new Error(`Audio fetch status ${audioRes.status}`);
+
+  const buffer = await audioRes.arrayBuffer();
+  return { buffer, contentType: "audio/mpeg" };
+}
+
 // Piped is a YouTube proxy — streams route through their servers, not ours.
 // No API key needed. Tries multiple instances for resilience.
 async function downloadViaPiped(url: string): Promise<{ buffer: ArrayBuffer; contentType: string }> {
@@ -150,7 +183,17 @@ export async function POST(req: NextRequest) {
   if (!url.includes("youtube.com/") && !url.includes("youtu.be/"))
     return NextResponse.json({ error: "Not a YouTube URL" }, { status: 400 });
 
-  // --- Try Piped first (proxies streams through their servers, no Render IP block) ---
+  // --- Try RapidAPI first (routes through their servers, no Render IP block) ---
+  try {
+    const { buffer, contentType } = await downloadViaRapidAPI(url);
+    return new NextResponse(buffer, {
+      headers: { "Content-Type": contentType, "Content-Disposition": `attachment; filename="track.mp3"` },
+    });
+  } catch (rapidErr) {
+    process.stderr.write(`[extract-youtube] rapidapi failed: ${rapidErr}\n`);
+  }
+
+  // --- Try Piped (proxies streams through their servers, no Render IP block) ---
   try {
     const { buffer, contentType } = await downloadViaPiped(url);
     const ext = contentType.includes("webm") ? "webm" : contentType.includes("mpeg") ? "mp3" : "m4a";
