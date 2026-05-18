@@ -78,7 +78,7 @@ async function downloadViaRapidAPI(url: string): Promise<{ buffer: ArrayBuffer; 
   if (!metaRes.ok) throw new Error(`RapidAPI status ${metaRes.status}`);
 
   const meta = await metaRes.json() as { linkDownload?: string; linkStream?: string; link?: string; url?: string; audio?: string; error?: string | boolean };
-  if (meta.error && meta.error !== false) throw new Error(String(meta.error));
+  if (meta.error && typeof meta.error === "string") throw new Error(meta.error);
 
   const downloadUrl = meta.linkDownload ?? meta.linkStream ?? meta.link ?? meta.url ?? meta.audio;
   if (!downloadUrl) throw new Error(`No download URL in response: ${JSON.stringify(meta)}`);
