@@ -77,17 +77,19 @@ async function downloadViaRapidAPI(url: string): Promise<{ buffer: ArrayBuffer; 
 
   if (!metaRes.ok) throw new Error(`RapidAPI status ${metaRes.status}`);
 
-  const meta = await metaRes.json() as { link?: string; url?: string; audio?: string; error?: string };
-  if (meta.error) throw new Error(meta.error);
+  const meta = await metaRes.json() as { linkDownload?: string; linkStream?: string; link?: string; url?: string; audio?: string; error?: string | boolean };
+  if (meta.error && meta.error !== false) throw new Error(String(meta.error));
 
-  const downloadUrl = meta.link ?? meta.url ?? meta.audio;
+  const downloadUrl = meta.linkDownload ?? meta.linkStream ?? meta.link ?? meta.url ?? meta.audio;
   if (!downloadUrl) throw new Error(`No download URL in response: ${JSON.stringify(meta)}`);
 
   const audioRes = await fetch(downloadUrl, { signal: AbortSignal.timeout(60000) });
   if (!audioRes.ok) throw new Error(`Audio fetch status ${audioRes.status}`);
 
   const buffer = await audioRes.arrayBuffer();
-  return { buffer, contentType: "audio/mpeg" };
+  const ext = (downloadUrl ?? "").includes("ext=m4a") ? "m4a" : "mp3";
+  const contentType = ext === "m4a" ? "audio/mp4" : "audio/mpeg";
+  return { buffer, contentType };
 }
 
 // Piped is a YouTube proxy — streams route through their servers, not ours.
@@ -186,8 +188,9 @@ export async function POST(req: NextRequest) {
   // --- Try RapidAPI first (routes through their servers, no Render IP block) ---
   try {
     const { buffer, contentType } = await downloadViaRapidAPI(url);
+    const ext = contentType.includes("mp4") ? "m4a" : "mp3";
     return new NextResponse(buffer, {
-      headers: { "Content-Type": contentType, "Content-Disposition": `attachment; filename="track.mp3"` },
+      headers: { "Content-Type": contentType, "Content-Disposition": `attachment; filename="track.${ext}"` },
     });
   } catch (rapidErr) {
     process.stderr.write(`[extract-youtube] rapidapi failed: ${rapidErr}\n`);
