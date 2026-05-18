@@ -103,6 +103,15 @@ async def analyze(
 
 @app.post("/extract-stems")
 async def extract_stems_endpoint(file: UploadFile = File(...)):
+    try:
+        import torch  # noqa: F401
+        from demucs.pretrained import get_model  # noqa: F401
+    except ImportError:
+        raise HTTPException(
+            status_code=503,
+            detail="Vocal removal requires more memory than the current server plan supports. Upgrade to unlock this feature.",
+        )
+
     suffix = Path(file.filename or "track.mp3").suffix or ".mp3"
     temp_dir = Path(tempfile.mkdtemp(prefix="jam-stems-"))
     input_path = temp_dir / f"upload{suffix}"

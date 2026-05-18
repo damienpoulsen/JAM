@@ -1762,10 +1762,6 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
                                                     currentMode === "notes" ? "intervals" : "notes"
                                                 )
                                             }
-                                            voxRemoval={voxRemoval}
-                                            voxLoading={voxLoading}
-                                            voxError={voxError}
-                                            onToggleVoxRemoval={() => { void toggleVoxRemoval(); }}
                                             playbackRate={playbackRate}
                                             tempoDisplayMode={tempoDisplayMode}
                                             baseBpm={displayBpm === "--" ? null : typeof displayBpm === "number" ? displayBpm : Number(displayBpm) || null}

@@ -25,9 +25,6 @@ type OverlayControlsProps = {
     metronomeOpen: boolean;
     noteDisplayMode: NoteDisplayMode;
     theorySettings: TheorySettings;
-    voxRemoval: boolean;
-    voxLoading: boolean;
-    voxError: string;
     onFocusAreaChange: (f: FocusArea) => void;
     onTheoryChange: (s: TheorySettings) => void;
     onDecreaseTempo: () => void;
@@ -39,7 +36,6 @@ type OverlayControlsProps = {
     onToggleMetronome: () => void;
     onToggleMetronomeOpen: () => void;
     onToggleNoteDisplayMode: () => void;
-    onToggleVoxRemoval: () => void;
     playbackRate: number;
     tempoDisplayMode: "percent" | "bpm";
 };
@@ -402,30 +398,24 @@ function ControlButtonGrid({
     metronomeEnabled,
     metronomeOpen,
     noteDisplayMode,
-    voxRemoval,
-    voxLoading,
     onDecreaseMetronomeBpm,
     onIncreaseMetronomeBpm,
     onToggleMetronome,
     onToggleMetronomeOpen,
     onToggleLoopMode,
     onToggleNoteDisplayMode,
-    onToggleVoxRemoval,
 }: {
     loopMode: boolean;
     metronomeBpm: number;
     metronomeEnabled: boolean;
     metronomeOpen: boolean;
     noteDisplayMode: NoteDisplayMode;
-    voxRemoval: boolean;
-    voxLoading: boolean;
     onDecreaseMetronomeBpm: () => void;
     onIncreaseMetronomeBpm: () => void;
     onToggleMetronome: () => void;
     onToggleMetronomeOpen: () => void;
     onToggleLoopMode: () => void;
     onToggleNoteDisplayMode: () => void;
-    onToggleVoxRemoval: () => void;
 }) {
     const actionButtonClass =
         "box-border flex size-10 min-h-10 min-w-10 max-h-10 max-w-10 aspect-square items-center justify-center rounded-md border-2 bg-black transition";
@@ -464,16 +454,6 @@ function ControlButtonGrid({
         </svg>
     );
 
-    const VoxIcon = () => (
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="9" y="2" width="6" height="11" rx="3" />
-            <path d="M5 10a7 7 0 0 0 14 0" />
-            <line x1="12" y1="17" x2="12" y2="21" />
-            <line x1="8" y1="21" x2="16" y2="21" />
-            {voxRemoval && <line x1="3" y1="3" x2="21" y2="21" strokeWidth="2" />}
-        </svg>
-    );
-
     const buttonItems = [
         {
             icon: <NoteIcon />,
@@ -492,20 +472,11 @@ function ControlButtonGrid({
             onClick: onToggleLoopMode,
             active: loopMode,
         },
-        {
-            icon: voxLoading
-                ? <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" /></svg>
-                : <VoxIcon />,
-            label: voxLoading ? "Processing" : voxRemoval ? "Instrumental" : "VOX",
-            onClick: voxLoading ? () => {} : onToggleVoxRemoval,
-            active: voxRemoval,
-            pulsing: voxLoading,
-        },
     ];
 
     return (
         <div className="relative">
-            <div className="grid w-full grid-cols-4 justify-items-center gap-y-2 py-1">
+            <div className="grid w-full grid-cols-3 justify-items-center gap-y-2 py-1">
                 {buttonItems.map((item, i) => (
                     <div key={i} className="flex w-[60px] flex-col items-center gap-1.5">
                         <button
@@ -562,9 +533,6 @@ export default function OverlayControls({
     metronomeOpen,
     noteDisplayMode,
     theorySettings,
-    voxRemoval,
-    voxLoading,
-    voxError,
     onFocusAreaChange,
     onTheoryChange,
     onDecreaseTempo,
@@ -576,7 +544,6 @@ export default function OverlayControls({
     onToggleMetronome,
     onToggleMetronomeOpen,
     onToggleNoteDisplayMode,
-    onToggleVoxRemoval,
     playbackRate,
     tempoDisplayMode,
 }: OverlayControlsProps) {
@@ -606,24 +573,16 @@ export default function OverlayControls({
                             metronomeEnabled={metronomeEnabled}
                             metronomeOpen={metronomeOpen}
                             noteDisplayMode={noteDisplayMode}
-                            voxRemoval={voxRemoval}
-                            voxLoading={voxLoading}
                             onDecreaseMetronomeBpm={onDecreaseMetronomeBpm}
                             onIncreaseMetronomeBpm={onIncreaseMetronomeBpm}
                             onToggleMetronome={onToggleMetronome}
                             onToggleMetronomeOpen={onToggleMetronomeOpen}
                             onToggleLoopMode={onToggleLoopMode}
                             onToggleNoteDisplayMode={onToggleNoteDisplayMode}
-                            onToggleVoxRemoval={onToggleVoxRemoval}
                         />
                         {audioError && (
                             <div className="rounded-lg border border-amber-300/20 bg-amber-400/10 px-3 py-2 text-[11px] text-amber-100/90">
                                 {audioError}
-                            </div>
-                        )}
-                        {voxError && (
-                            <div className="rounded-lg border border-red-400/20 bg-red-500/10 px-3 py-2 text-[11px] text-red-200/90">
-                                VOX: {voxError}
                             </div>
                         )}
                     </div>
