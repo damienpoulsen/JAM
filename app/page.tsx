@@ -168,11 +168,19 @@ export default function Home() {
     }
     setYtLoading(true);
     setYtError("");
+    let videoTitle = "YouTube Track";
+    try {
+      const oEmbed = await fetch(`https://www.youtube.com/oembed?url=${encodeURIComponent(url)}&format=json`);
+      if (oEmbed.ok) {
+        const data = await oEmbed.json() as { title?: string };
+        if (data.title) videoTitle = data.title;
+      }
+    } catch { /* use default title */ }
     const id = crypto.randomUUID();
     const pendingSong: Song = {
       id,
       fileId: id,
-      name: "YouTube Track",
+      name: videoTitle,
       key: "Unknown",
       bpm: "--",
       analysisStatus: "pending",
