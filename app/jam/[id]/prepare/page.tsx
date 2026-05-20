@@ -431,16 +431,54 @@ export default function PrepareJamPage({ params }: { params: Promise<{ id: strin
 
               <>
                   <p style={{ fontFamily: "'Lora', serif", fontSize: 13, color: "rgba(165,118,248,0.45)", fontStyle: "italic", marginBottom: 32, lineHeight: 1.6 }}>
-                    Chord data, BPM, and key are ready.
+                    Chord data, BPM, and key are ready. Choose your mode.
                   </p>
-                  <button
-                    type="button"
-                    onClick={() => router.replace(`/jam/${id}`)}
-                    className="action-btn w-full rounded-lg px-6 py-3"
-                    style={{ background: "rgba(10,6,22,0.97)", border: "1.5px solid rgba(130,60,220,0.65)", boxShadow: "0 0 14px rgba(110,40,210,0.5), 0 6px 20px rgba(0,0,0,0.5)", fontFamily: "'Courier Prime', monospace", fontSize: 13, fontWeight: 700, letterSpacing: "0.1em", color: "white", cursor: "pointer" }}
-                  >
-                    OPEN JAM →
-                  </button>
+
+                  {/* Mode selector cards */}
+                  <div className="flex gap-4">
+                    {/* JAM MODE */}
+                    <button
+                      type="button"
+                      onClick={() => router.replace(`/jam/${id}`)}
+                      className="mode-card flex-1 rounded-2xl px-5 py-6 text-left"
+                      style={{ background: "rgba(10,6,22,0.97)", border: "1.5px solid rgba(125,55,210,0.55)", boxShadow: "0 6px 32px rgba(0,0,0,0.65), 0 0 24px rgba(110,40,210,0.14)", cursor: "pointer" }}
+                    >
+                      <div style={{ fontFamily: "'Courier Prime', monospace", fontSize: 10, letterSpacing: "0.18em", color: "rgba(165,118,248,0.6)", marginBottom: 10 }}>JAM MODE</div>
+                      <div style={{ fontFamily: "'Lora', serif", fontWeight: 700, fontSize: 18, color: "#ffffff", marginBottom: 10 }}>Play & Practice</div>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 5, marginBottom: 20 }}>
+                        {["Chord display", "Fretboard overlays", "Theory layers", "Metronome & looper"].map(f => (
+                          <div key={f} style={{ display: "flex", alignItems: "center", gap: 7, fontFamily: "'Lora', serif", fontSize: 12, color: "rgba(185,155,240,0.65)" }}>
+                            <svg viewBox="0 0 24 24" width={11} height={11} fill="none" stroke="rgba(165,118,248,0.7)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                            {f}
+                          </div>
+                        ))}
+                      </div>
+                      <div style={{ fontFamily: "'Courier Prime', monospace", fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", color: "white" }}>OPEN JAM →</div>
+                    </button>
+
+                    {/* STUDIO MODE */}
+                    <button
+                      type="button"
+                      onClick={() => router.replace(`/studio/${id}`)}
+                      className="mode-card flex-1 rounded-2xl px-5 py-6 text-left"
+                      style={{ background: "rgba(10,6,22,0.85)", border: "1.5px solid rgba(125,55,210,0.3)", boxShadow: "0 6px 32px rgba(0,0,0,0.45)", cursor: "pointer", opacity: 0.75 }}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+                        <span style={{ fontFamily: "'Courier Prime', monospace", fontSize: 10, letterSpacing: "0.18em", color: "rgba(165,118,248,0.5)" }}>STUDIO MODE</span>
+                        <span style={{ fontFamily: "'Courier Prime', monospace", fontSize: 8, letterSpacing: "0.14em", color: "rgba(185,135,255,0.8)", background: "rgba(115,45,210,0.3)", border: "1px solid rgba(140,70,225,0.5)", borderRadius: 4, padding: "1px 6px" }}>PRO</span>
+                      </div>
+                      <div style={{ fontFamily: "'Lora', serif", fontWeight: 700, fontSize: 18, color: "rgba(255,255,255,0.6)", marginBottom: 10 }}>Create & Produce</div>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 5, marginBottom: 20 }}>
+                        {["6-stem splitting", "Multi-track looper", "DAW-style layout", "Plugin overlays"].map(f => (
+                          <div key={f} style={{ display: "flex", alignItems: "center", gap: 7, fontFamily: "'Lora', serif", fontSize: 12, color: "rgba(185,155,240,0.4)" }}>
+                            <svg viewBox="0 0 24 24" width={11} height={11} fill="none" stroke="rgba(165,118,248,0.4)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                            {f}
+                          </div>
+                        ))}
+                      </div>
+                      <div style={{ fontFamily: "'Courier Prime', monospace", fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", color: "rgba(255,255,255,0.35)" }}>COMING SOON →</div>
+                    </button>
+                  </div>
                 </>
             </div>
 
