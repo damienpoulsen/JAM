@@ -603,8 +603,8 @@ export default function Home() {
               fontSize: 20,
               fontWeight: 700,
               letterSpacing: "0.44em",
-              color: "rgba(165,118,248,0.95)",
-              WebkitTextStroke: "0.4px rgba(165,118,248,0.85)",
+              color: "rgba(118,155,248,0.95)",
+              WebkitTextStroke: "0.4px rgba(118,155,248,0.85)",
               marginTop: -40,
               marginBottom: 18,
               textAlign: "center",
@@ -623,15 +623,15 @@ export default function Home() {
                 height: 139,
                 width: "calc(50% - 8px)",
                 background: "rgba(10,6,22,0.97)",
-                border: "1.5px solid rgba(125,55,210,0.6)",
+                border: "1.5px solid rgba(55,100,210,0.6)",
                 boxShadow: "0 6px 32px rgba(0,0,0,0.65), 0 0 24px rgba(110,40,210,0.18)",
               }}
             >
               <div style={{
                 width: 60, height: 60,
                 borderRadius: 16,
-                background: "rgba(115,45,210,0.28)",
-                border: "1.5px solid rgba(140,70,225,0.55)",
+                background: "rgba(45,90,210,0.28)",
+                border: "1.5px solid rgba(70,120,225,0.55)",
                 display: "flex", alignItems: "center", justifyContent: "center",
                 flexShrink: 0,
               }}>
@@ -641,7 +641,7 @@ export default function Home() {
               </div>
               <div>
                 <div style={{ fontFamily: "'Lora', serif", fontWeight: 700, fontSize: 21, color: "#ffffff" }}>Upload Track</div>
-                <div style={{ fontFamily: "'Courier Prime', monospace", fontSize: 13, color: "rgba(155,110,240,0.62)", letterSpacing: "0.08em", marginTop: 6 }}>MP3, MP4 or YouTube link</div>
+                <div style={{ fontFamily: "'Courier Prime', monospace", fontSize: 13, color: "rgba(110,145,240,0.62)", letterSpacing: "0.08em", marginTop: 6 }}>MP3, MP4 or YouTube link</div>
               </div>
             </div>
           </div>
@@ -684,12 +684,12 @@ export default function Home() {
               </div>
               <div>
                 <div style={{ fontFamily: "'Lora', serif", fontWeight: 700, fontSize: 17, color: "#ffffff" }}>My Tracks</div>
-                <div style={{ fontFamily: "'Courier Prime', monospace", fontSize: 11, color: "rgba(165,118,248,0.6)", letterSpacing: "0.1em", marginTop: 2 }}>
+                <div style={{ fontFamily: "'Courier Prime', monospace", fontSize: 11, color: "rgba(118,155,248,0.6)", letterSpacing: "0.1em", marginTop: 2 }}>
                   {songs.length} {songs.length === 1 ? "TRACK" : "TRACKS"}
                 </div>
               </div>
             </div>
-            <svg viewBox="0 0 24 24" width={18} height={18} fill="none" stroke="rgba(165,118,248,0.6)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg viewBox="0 0 24 24" width={18} height={18} fill="none" stroke="rgba(118,155,248,0.6)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M5 12h14M12 5l7 7-7 7" />
             </svg>
           </Link>
@@ -874,15 +874,15 @@ export default function Home() {
             style={{ background: "rgba(0,0,0,0.72)", backdropFilter: "blur(8px)" }}
             onClick={(e) => { if (e.target === e.currentTarget) { setUploadModalOpen(false); setYtUrl(""); setYtError(""); } }}
           >
-            <div className="w-full max-w-sm mx-4 rounded-2xl p-7 flex flex-col gap-5" style={{ background: "rgba(10,6,22,0.98)", border: "1.5px solid rgba(125,55,210,0.55)", boxShadow: "0 24px 60px rgba(0,0,0,0.6), 0 0 40px rgba(110,40,210,0.15)" }}>
+            <div className="w-full max-w-sm mx-4 rounded-2xl p-7 flex flex-col gap-5" style={{ background: "rgba(10,6,22,0.98)", border: "1.5px solid rgba(55,100,210,0.55)", boxShadow: "0 24px 60px rgba(0,0,0,0.6), 0 0 40px rgba(110,40,210,0.15)" }}>
 
               {/* Header */}
               <div className="flex items-center justify-between">
                 <div>
                   <div style={{ fontFamily: "'Lora', serif", fontWeight: 700, fontSize: 20, color: "#fff" }}>Upload Track</div>
-                  <div style={{ fontFamily: "'Courier Prime', monospace", fontSize: 11, letterSpacing: "0.14em", color: "rgba(165,118,248,0.5)", marginTop: 3 }}>CHOOSE HOW TO ADD</div>
+                  <div style={{ fontFamily: "'Courier Prime', monospace", fontSize: 11, letterSpacing: "0.14em", color: "rgba(118,155,248,0.5)", marginTop: 3 }}>CHOOSE HOW TO ADD</div>
                 </div>
-                <button onClick={() => { setUploadModalOpen(false); setYtUrl(""); setYtError(""); }} style={{ background: "none", border: "none", color: "rgba(165,118,248,0.45)", cursor: "pointer", padding: 4 }}>
+                <button onClick={() => { setUploadModalOpen(false); setYtUrl(""); setYtError(""); }} style={{ background: "none", border: "none", color: "rgba(118,155,248,0.45)", cursor: "pointer", padding: 4 }}>
                   <svg viewBox="0 0 24 24" width={18} height={18} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 6 6 18M6 6l12 12" /></svg>
                 </button>
               </div>
@@ -891,38 +891,38 @@ export default function Home() {
               <button
                 onClick={() => fileInputRef.current?.click()}
                 className="upload-card flex items-center gap-4 rounded-xl px-5 py-4 w-full text-left"
-                style={{ background: "rgba(115,45,210,0.12)", border: "1.5px solid rgba(125,55,210,0.5)", cursor: "pointer" }}
+                style={{ background: "rgba(45,90,210,0.12)", border: "1.5px solid rgba(55,100,210,0.5)", cursor: "pointer" }}
               >
-                <div style={{ width: 42, height: 42, borderRadius: 12, background: "rgba(115,45,210,0.25)", border: "1px solid rgba(140,70,225,0.5)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                <div style={{ width: 42, height: 42, borderRadius: 12, background: "rgba(45,90,210,0.25)", border: "1px solid rgba(70,120,225,0.5)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                   <svg viewBox="0 0 24 24" width={22} height={22} fill="none" stroke="rgba(185,135,255,0.95)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M12 16V4" /><path d="m7 9 5-5 5 5" /><path d="M5 20h14" />
                   </svg>
                 </div>
                 <div>
                   <div style={{ fontFamily: "'Lora', serif", fontWeight: 700, fontSize: 15, color: "#fff" }}>Upload a file</div>
-                  <div style={{ fontFamily: "'Courier Prime', monospace", fontSize: 11, color: "rgba(155,110,240,0.55)", letterSpacing: "0.08em", marginTop: 2 }}>MP3, MP4 or YouTube</div>
+                  <div style={{ fontFamily: "'Courier Prime', monospace", fontSize: 11, color: "rgba(110,145,240,0.55)", letterSpacing: "0.08em", marginTop: 2 }}>MP3, MP4 or YouTube</div>
                 </div>
               </button>
 
               {/* Divider */}
               <div className="flex items-center gap-3">
-                <div style={{ flex: 1, height: 1, background: "rgba(125,55,210,0.25)" }} />
-                <span style={{ fontFamily: "'Courier Prime', monospace", fontSize: 10, letterSpacing: "0.18em", color: "rgba(165,118,248,0.4)" }}>OR</span>
-                <div style={{ flex: 1, height: 1, background: "rgba(125,55,210,0.25)" }} />
+                <div style={{ flex: 1, height: 1, background: "rgba(55,100,210,0.25)" }} />
+                <span style={{ fontFamily: "'Courier Prime', monospace", fontSize: 10, letterSpacing: "0.18em", color: "rgba(118,155,248,0.4)" }}>OR</span>
+                <div style={{ flex: 1, height: 1, background: "rgba(55,100,210,0.25)" }} />
               </div>
 
               {/* YouTube URL option */}
               <div className="flex flex-col gap-2">
                 <div className="flex items-center justify-between">
-                  <div style={{ fontFamily: "'Courier Prime', monospace", fontSize: 10, letterSpacing: "0.18em", color: "rgba(165,118,248,0.55)" }}>YOUTUBE URL</div>
-                  <div style={{ fontFamily: "'Courier Prime', monospace", fontSize: 9, letterSpacing: "0.12em", color: ytRemaining === 0 ? "rgba(255,100,100,0.7)" : "rgba(165,118,248,0.4)" }}>
+                  <div style={{ fontFamily: "'Courier Prime', monospace", fontSize: 10, letterSpacing: "0.18em", color: "rgba(118,155,248,0.55)" }}>YOUTUBE URL</div>
+                  <div style={{ fontFamily: "'Courier Prime', monospace", fontSize: 9, letterSpacing: "0.12em", color: ytRemaining === 0 ? "rgba(255,100,100,0.7)" : "rgba(118,155,248,0.4)" }}>
                     {ytRemaining}/{YT_LIMIT} IMPORTS LEFT THIS MONTH
                   </div>
                 </div>
                 <div className="flex gap-2">
                   <input
                     className="flex-1 rounded-lg px-3 py-2.5"
-                    style={{ background: "rgba(10,6,22,0.95)", border: "1.5px solid rgba(125,55,210,0.45)", color: "white", fontFamily: "'Lora', serif", fontSize: 14, outline: "none", opacity: ytRemaining === 0 ? 0.4 : 1 }}
+                    style={{ background: "rgba(10,6,22,0.95)", border: "1.5px solid rgba(55,100,210,0.45)", color: "white", fontFamily: "'Lora', serif", fontSize: 14, outline: "none", opacity: ytRemaining === 0 ? 0.4 : 1 }}
                     placeholder={ytRemaining === 0 ? "Monthly limit reached" : "https://youtube.com/watch?v=…"}
                     value={ytUrl}
                     disabled={ytRemaining === 0}
@@ -933,7 +933,7 @@ export default function Home() {
                   <button
                     onClick={handleYoutubeUpload}
                     disabled={ytLoading || !ytUrl.trim() || ytRemaining === 0}
-                    style={{ background: "rgba(115,45,210,0.35)", border: "1.5px solid rgba(140,70,225,0.55)", borderRadius: 10, padding: "0 14px", color: "white", cursor: ytUrl.trim() && !ytLoading && ytRemaining > 0 ? "pointer" : "not-allowed", flexShrink: 0 }}
+                    style={{ background: "rgba(45,90,210,0.35)", border: "1.5px solid rgba(70,120,225,0.55)", borderRadius: 10, padding: "0 14px", color: "white", cursor: ytUrl.trim() && !ytLoading && ytRemaining > 0 ? "pointer" : "not-allowed", flexShrink: 0 }}
                   >
                     <svg viewBox="0 0 24 24" width={16} height={16} fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                       <path d="m9 18 6-6-6-6" />
