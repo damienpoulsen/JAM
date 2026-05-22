@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import { useRouter } from "next/navigation";
+import ProSidebar from "./(pro)/ProSidebar";
 import { useForm, ValidationError } from "@formspree/react";
 import { deleteFile, getFile, saveFile } from "../lib/db";
 import { readSongs, type Song, writeSongs } from "../lib/songs";
@@ -531,8 +532,10 @@ export default function Home() {
         }
       `}</style>
 
+      <div className="flex h-screen overflow-hidden">
+        <ProSidebar />
       <main
-        className="relative h-screen overflow-hidden text-white"
+        className="relative flex-1 h-screen overflow-hidden text-white"
         style={{ fontFamily: "'Lora', serif", background: "#070610" }}
       >
         {/* Atmospheric background — curved purple streaks top-left and bottom-right */}
@@ -1055,6 +1058,7 @@ export default function Home() {
           </div>
         )}
       </main>
+      </div>
     </>
   );
 }
