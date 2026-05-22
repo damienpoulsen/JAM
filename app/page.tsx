@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
-import { useRouter, usePathname } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useForm, ValidationError } from "@formspree/react";
 import { deleteFile, getFile, saveFile } from "../lib/db";
 import { readSongs, type Song, writeSongs } from "../lib/songs";
@@ -25,7 +25,6 @@ const LET_HER_GO = { slug: "let-her-go", name: "Let Her Go", artist: "Passenger"
 
 export default function Home() {
   const router = useRouter();
-  const pathname = usePathname();
   const [songs, setSongs] = useState<Song[]>(() => readSongs());
   const [openMenuIndex, setOpenMenuIndex] = useState<number | null>(null);
   const [menuPosition, setMenuPosition] = useState<{ top: number; right: number } | null>(null);
@@ -526,7 +525,7 @@ export default function Home() {
       `}</style>
 
       <main
-        className="relative flex h-screen overflow-hidden text-white"
+        className="relative h-screen overflow-hidden text-white"
         style={{ fontFamily: "'Lora', serif", background: "#070610" }}
       >
         {/* Atmospheric background — curved purple streaks top-left and bottom-right */}
@@ -540,75 +539,6 @@ export default function Home() {
           {/* Bottom-right streak accent */}
           <div className="absolute" style={{ width: 680, height: 270, bottom: -110, right: -210, background: "radial-gradient(ellipse at 58% 50%, rgba(175,65,255,0.68) 0%, rgba(135,38,235,0.32) 45%, transparent 72%)", filter: "blur(58px)", transform: "rotate(-40deg)" }} />
         </div>
-
-        {/* Sidebar — desktop only */}
-        <aside className="hidden min-[900px]:flex flex-col flex-shrink-0 relative z-20" style={{ width: 220, borderRight: "1px solid rgba(125,55,210,0.18)", background: "rgba(5,4,14,0.98)" }}>
-          {/* Logo */}
-          <div style={{ padding: "28px 24px 20px" }}>
-            <span style={{ fontFamily: "'DM Serif Display', serif", fontSize: 28, fontWeight: 400, letterSpacing: 6, color: "#ffffff", textShadow: "0 0 18px rgba(142,28,255,0.7)" }}>JAM</span>
-          </div>
-
-          {/* Nav */}
-          <nav className="flex flex-col" style={{ padding: "0 12px", gap: 2 }}>
-            <div style={{ fontFamily: "'Courier Prime', monospace", fontSize: 9, letterSpacing: "0.18em", color: "rgba(165,118,248,0.4)", padding: "6px 12px 4px", marginTop: 4 }}>NAV</div>
-            {[
-              { label: "Home", href: "/", icon: <svg viewBox="0 0 24 24" width={14} height={14} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg> },
-              { label: "My Library", href: "/songs", icon: <svg viewBox="0 0 24 24" width={14} height={14} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg> },
-              { label: "Discover", href: "/library", icon: <svg viewBox="0 0 24 24" width={14} height={14} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg> },
-            ].map(({ label, href, icon }) => {
-              const active = pathname === href;
-              return (
-                <Link key={href} href={href} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", borderRadius: 8, background: active ? "rgba(125,55,210,0.22)" : "transparent", color: active ? "rgba(210,175,255,0.95)" : "rgba(185,155,240,0.6)", fontFamily: "'Courier Prime', monospace", fontSize: 12, letterSpacing: "0.06em", textDecoration: "none", transition: "background 0.15s, color 0.15s", border: active ? "1px solid rgba(125,55,210,0.35)" : "1px solid transparent" }}
-                  onMouseEnter={e => { if (!active) { e.currentTarget.style.background = "rgba(125,55,210,0.1)"; e.currentTarget.style.color = "rgba(210,175,255,0.8)"; } }}
-                  onMouseLeave={e => { if (!active) { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "rgba(185,155,240,0.6)"; } }}
-                >
-                  {icon}{label}
-                </Link>
-              );
-            })}
-
-            <div style={{ fontFamily: "'Courier Prime', monospace", fontSize: 9, letterSpacing: "0.18em", color: "rgba(165,118,248,0.4)", padding: "14px 12px 4px" }}>PRO</div>
-            {[
-              { label: "Chord Book", href: "/chord-book", icon: <svg viewBox="0 0 24 24" width={14} height={14} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg> },
-              { label: "Mashup Lab", href: "/mashup", icon: <svg viewBox="0 0 24 24" width={14} height={14} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18V5l12-2v13"/><path d="M5 21v-7"/><path d="M2 18l6 6"/><path d="M8 18l-6 6"/></svg> },
-            ].map(({ label, href, icon }) => (
-              <Link key={href} href={href} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", borderRadius: 8, background: "transparent", color: "rgba(185,155,240,0.55)", fontFamily: "'Courier Prime', monospace", fontSize: 12, letterSpacing: "0.06em", textDecoration: "none", transition: "background 0.15s, color 0.15s", border: "1px solid transparent" }}
-                onMouseEnter={e => { e.currentTarget.style.background = "rgba(125,55,210,0.1)"; e.currentTarget.style.color = "rgba(210,175,255,0.75)"; }}
-                onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "rgba(185,155,240,0.55)"; }}
-              >
-                {icon}
-                {label}
-                <span style={{ marginLeft: "auto", fontFamily: "'Courier Prime', monospace", fontSize: 8, letterSpacing: "0.14em", color: "rgba(185,135,255,0.7)", background: "rgba(115,45,210,0.25)", border: "1px solid rgba(140,70,225,0.4)", borderRadius: 4, padding: "1px 5px" }}>PRO</span>
-              </Link>
-            ))}
-          </nav>
-
-          {/* Bottom */}
-          <div className="mt-auto flex flex-col" style={{ padding: "0 12px 24px", gap: 8 }}>
-            {/* Upgrade CTA */}
-            <div style={{ borderRadius: 10, border: "1px solid rgba(140,70,225,0.35)", background: "rgba(115,45,210,0.12)", padding: "12px 14px" }}>
-              <div style={{ fontFamily: "'Courier Prime', monospace", fontSize: 10, letterSpacing: "0.14em", color: "rgba(185,135,255,0.9)", marginBottom: 6 }}>UPGRADE TO PRO</div>
-              <div style={{ fontFamily: "'Lora', serif", fontSize: 11, color: "rgba(185,155,240,0.6)", lineHeight: 1.5, marginBottom: 10 }}>Studio Mode, Chord Book, Mashup Lab & more.</div>
-              <button type="button" style={{ width: "100%", padding: "7px 0", borderRadius: 7, background: "rgba(125,55,210,0.45)", border: "1px solid rgba(155,85,240,0.6)", color: "white", fontFamily: "'Courier Prime', monospace", fontSize: 10, letterSpacing: "0.12em", cursor: "pointer" }}>
-                COMING SOON
-              </button>
-            </div>
-            {/* Feedback */}
-            <button
-              type="button"
-              onClick={() => setFeedbackOpen(true)}
-              style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", borderRadius: 8, background: "transparent", color: "rgba(185,155,240,0.5)", fontFamily: "'Courier Prime', monospace", fontSize: 11, letterSpacing: "0.06em", border: "1px solid transparent", cursor: "pointer", transition: "background 0.15s, color 0.15s" }}
-              onMouseEnter={e => { e.currentTarget.style.background = "rgba(125,55,210,0.1)"; e.currentTarget.style.color = "rgba(210,175,255,0.75)"; }}
-              onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "rgba(185,155,240,0.5)"; }}
-            >
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg>
-              Share feedback
-            </button>
-          </div>
-        </aside>
-
-        {/* Main content wrapper */}
-        <div className="relative flex-1 overflow-hidden">
 
         {/* Song Demos — desktop top-right */}
         <Link
@@ -926,9 +856,16 @@ export default function Home() {
           >
             ?
           </button>
+          <button
+            type="button"
+            onClick={() => setFeedbackOpen(true)}
+            className="demo-btn-home flex items-center gap-2 rounded-lg px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.14em] backdrop-blur-sm"
+            style={{ fontFamily: "'Rajdhani', sans-serif", border: "1.5px solid rgba(130,60,220,0.65)", background: "rgba(10,6,22,0.85)", color: "white", boxShadow: "0 0 14px rgba(110,40,210,0.4), 0 0 28px rgba(110,40,210,0.18)" }}
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg>
+            Share feedback
+          </button>
         </div>
-
-        </div>{/* end main content wrapper */}
 
         {/* Upload modal */}
         {uploadModalOpen && (
