@@ -35,12 +35,7 @@ export default function RootLayout({
           data-website-id="32126f75-4892-4921-b47a-4ff89728eda1"
         />
       </head>
-      <body className="min-h-full flex flex-col">
-        {children}
-        <div style={{ position: "fixed", bottom: 14, left: 14, fontFamily: "monospace", fontSize: 9, letterSpacing: "0.18em", color: "rgba(185,135,255,0.7)", background: "rgba(115,45,210,0.22)", border: "1px solid rgba(140,70,225,0.4)", borderRadius: 4, padding: "3px 8px", zIndex: 9999, pointerEvents: "none" }}>
-          PRO DEV
-        </div>
-      </body>
+      <body className="min-h-full flex flex-col">{children}</body>
     </html>
   );
 }
