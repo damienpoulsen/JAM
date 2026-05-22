@@ -25,7 +25,11 @@ const LET_HER_GO = { slug: "let-her-go", name: "Let Her Go", artist: "Passenger"
 
 export default function Home() {
   const router = useRouter();
-  const [songs, setSongs] = useState<Song[]>(() => readSongs());
+  const [songs, setSongs] = useState<Song[]>([]);
+
+  useEffect(() => {
+    setSongs(readSongs());
+  }, []);
   const [openMenuIndex, setOpenMenuIndex] = useState<number | null>(null);
   const [menuPosition, setMenuPosition] = useState<{ top: number; right: number } | null>(null);
   const [mobileNoticeOpen, setMobileNoticeOpen] = useState(false);
@@ -47,13 +51,15 @@ export default function Home() {
       return JSON.parse(raw) as { count: number; month: string };
     } catch { return { count: 0, month: "" }; }
   };
-  const ytUsage = (() => {
+  const [ytRemaining, setYtRemaining] = useState(YT_LIMIT);
+
+  useEffect(() => {
     const now = new Date();
     const month = `${now.getFullYear()}-${now.getMonth()}`;
     const stored = getYtUsage();
-    return stored.month === month ? stored.count : 0;
-  })();
-  const ytRemaining = Math.max(0, YT_LIMIT - ytUsage);
+    const used = stored.month === month ? stored.count : 0;
+    setYtRemaining(Math.max(0, YT_LIMIT - used));
+  }, []);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Inline audio preview state
@@ -211,6 +217,7 @@ export default function Home() {
       youtubeUrl: url,
     };
     localStorage.setItem("jam-yt-usage", JSON.stringify({ count: currentCount + 1, month }));
+    setYtRemaining(Math.max(0, YT_LIMIT - (currentCount + 1)));
     const updatedSongs = [pendingSong, ...readSongs()];
     setSongs(updatedSongs);
     writeSongs(updatedSongs);
