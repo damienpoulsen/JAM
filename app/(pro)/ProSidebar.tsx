@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
+import { readSongs, type Song } from "../../lib/songs";
 
 const NAV = [
   {
@@ -81,18 +83,49 @@ function Divider() {
 
 export default function ProSidebar() {
   const pathname = usePathname();
+  const [recentSongs, setRecentSongs] = useState<Song[]>([]);
+
+  useEffect(() => {
+    const songs = readSongs().filter((s) => s.analysisStatus === "ready").slice(0, 3);
+    setRecentSongs(songs);
+  }, []);
 
   return (
     <aside
       className="hidden min-[900px]:flex flex-col flex-shrink-0"
       style={{ width: 210, borderRight: "1px solid rgba(125,55,210,0.15)", background: "rgba(5,4,14,0.97)", zIndex: 20 }}
     >
-      {/* Logo */}
-      <div style={{ padding: "22px 18px 14px" }}>
+      {/* Logo + settings */}
+      <div style={{ padding: "20px 14px 14px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <Link href="/" style={{ textDecoration: "none" }}>
           <span style={{ fontFamily: "'DM Serif Display', serif", fontSize: 24, fontWeight: 400, letterSpacing: 5, color: "#ffffff", textShadow: "0 0 18px rgba(142,28,255,0.6)" }}>
             JAM
           </span>
+        </Link>
+        <Link
+          href="/settings"
+          title="Settings"
+          style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 30, height: 30, borderRadius: 8, background: "rgba(125,55,210,0.12)", border: "1px solid rgba(125,55,210,0.2)", color: "rgba(185,145,255,0.6)", textDecoration: "none", transition: "background 0.15s, color 0.15s" }}
+        >
+          <svg viewBox="0 0 24 24" width={14} height={14} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        </Link>
+      </div>
+
+      {/* New Session button */}
+      <div style={{ padding: "0 10px 10px" }}>
+        <Link
+          href="/"
+          style={{
+            display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+            padding: "10px", borderRadius: 9, textDecoration: "none",
+            background: "rgba(125,55,210,0.3)", border: "1px solid rgba(155,80,255,0.45)",
+            color: "rgba(225,200,255,0.9)", fontFamily: "'Courier Prime', monospace",
+            fontSize: 12, fontWeight: 700, letterSpacing: "0.1em",
+            transition: "background 0.15s",
+          }}
+        >
+          <svg viewBox="0 0 24 24" width={13} height={13} fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M12 5v14m-7-7h14"/></svg>
+          New Session
         </Link>
       </div>
 
@@ -109,12 +142,46 @@ export default function ProSidebar() {
         {MODES.map(({ label, href, icon, pro }) => (
           <NavLink key={label} label={label} href={href} icon={icon} active={pathname === href && label !== "JAM Mode" && label !== "Studio Mode"} pro={pro} />
         ))}
+
+        {/* Recent Sessions */}
+        {recentSongs.length > 0 && (
+          <>
+            <SectionLabel>RECENT</SectionLabel>
+            <div style={{ display: "flex", flexDirection: "column", gap: 2, padding: "0 4px" }}>
+              {recentSongs.map((song) => (
+                <Link
+                  key={song.id}
+                  href={`/jam/${song.id}`}
+                  style={{
+                    display: "flex", alignItems: "center", gap: 9, padding: "8px 10px",
+                    borderRadius: 8, textDecoration: "none", border: "1px solid transparent",
+                    transition: "background 0.15s",
+                  }}
+                >
+                  <div style={{ width: 28, height: 28, borderRadius: 6, background: "rgba(115,45,210,0.25)", border: "1px solid rgba(125,55,210,0.3)", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <svg viewBox="0 0 24 24" width={11} height={11} fill="rgba(185,145,255,0.7)"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontFamily: "'Lora', serif", fontSize: 11, color: "rgba(200,175,255,0.8)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", lineHeight: 1.3 }}>
+                      {song.name}
+                    </div>
+                    {song.key && song.key !== "Unknown" && (
+                      <div style={{ fontFamily: "'Courier Prime', monospace", fontSize: 9, color: "rgba(165,118,248,0.45)", letterSpacing: "0.08em" }}>
+                        {song.key} {typeof song.bpm === "number" ? `· ${Math.round(song.bpm)} BPM` : ""}
+                      </div>
+                    )}
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </>
+        )}
       </nav>
 
       <Divider />
 
       {/* Upgrade CTA */}
-      <div style={{ padding: "10px 12px 6px" }}>
+      <div style={{ padding: "10px 10px 6px" }}>
         <button style={{
           width: "100%", padding: "11px 14px", borderRadius: 10, cursor: "pointer", textAlign: "left",
           background: "linear-gradient(135deg, rgba(115,45,210,0.45), rgba(160,60,255,0.3))",
@@ -140,9 +207,6 @@ export default function ProSidebar() {
           <div style={{ fontFamily: "'Lora', serif", fontWeight: 700, fontSize: 13, color: "rgba(220,200,255,0.9)", lineHeight: 1.2 }}>Damie</div>
           <div style={{ fontFamily: "'Courier Prime', monospace", fontSize: 9, color: "rgba(165,118,248,0.5)", letterSpacing: "0.12em", marginTop: 1 }}>PRO MEMBER</div>
         </div>
-        <Link href="/settings" style={{ color: "rgba(165,118,248,0.4)", display: "flex" }}>
-          <svg viewBox="0 0 24 24" width={14} height={14} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-        </Link>
       </div>
     </aside>
   );
