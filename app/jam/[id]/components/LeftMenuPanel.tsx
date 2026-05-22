@@ -2,10 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import {
-    BLANK_THEORY,
-    LAYER_GROUPS,
     type TheorySettings,
-    type LayerKind,
 } from "@/lib/layers";
 
 type ChordLabelMode = "off" | "roman" | "number" | "theory";
@@ -148,10 +145,51 @@ export default function LeftMenuPanel({
                     {/* Scrollable content */}
                     <div className="flex flex-col flex-1 overflow-y-auto px-4 py-4 gap-5">
 
+                        {/* Switch Mode */}
+                        <div>
+                            <div className="mb-2.5 text-[10px] font-semibold uppercase tracking-[0.24em]" style={{ fontFamily: "'Rajdhani', sans-serif", color: p.label }}>
+                                Switch Mode
+                            </div>
+                            <div className="flex flex-col gap-1">
+                                {/* JAM Mode — active */}
+                                <div
+                                    className="flex items-center gap-2.5 rounded-lg px-3 py-2.5"
+                                    style={{ background: p.activeBg, border: `1px solid ${p.toggleBorder}` }}
+                                >
+                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: p.activeText }}><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                                    <span className="text-[12px] font-semibold flex-1" style={{ fontFamily: "'Rajdhani', sans-serif", color: p.activeText }}>JAM Mode</span>
+                                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ color: p.activeText }}><polyline points="20 6 9 17 4 12"/></svg>
+                                </div>
+                                {/* Studio Mode — PRO */}
+                                {([
+                                    { label: "Studio Mode", href: `/studio/${songId}`, icon: <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg> },
+                                    { label: "Chord Book",  href: "/chord-book",       icon: <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg> },
+                                    { label: "Mashup Lab",  href: "/mashup",           icon: <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6"/><path d="m15 18 6-6-6-6"/></svg> },
+                                ]).map(({ label, href, icon }) => (
+                                    <button
+                                        key={label}
+                                        type="button"
+                                        onClick={() => navigate(href)}
+                                        className="flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-left transition-colors"
+                                        style={{ border: `1px solid ${p.rowBorder}` }}
+                                        onMouseEnter={e => (e.currentTarget.style.background = p.rowHover)}
+                                        onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
+                                    >
+                                        <span style={{ color: p.inactiveText }}>{icon}</span>
+                                        <span className="text-[12px] font-semibold flex-1" style={{ fontFamily: "'Rajdhani', sans-serif", color: p.text }}>{label}</span>
+                                        <span className="text-[8px] font-bold tracking-[0.12em] px-1.5 py-0.5 rounded" style={{ fontFamily: "'Rajdhani', sans-serif", color: p.label, border: `1px solid ${p.rowBorder}` }}>PRO</span>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Divider */}
+                        <div style={{ height: 1, background: p.divider }} />
+
                         {/* Song Control */}
                         <div>
                             <div className="mb-2.5 text-[10px] font-semibold uppercase tracking-[0.24em]" style={{ fontFamily: "'Rajdhani', sans-serif", color: p.label }}>
-                                Song Control
+                                Song
                             </div>
                             <div className="flex flex-col gap-1">
                                 {songActions.map((action) => (
@@ -171,55 +209,6 @@ export default function LeftMenuPanel({
                                     </button>
                                 ))}
                             </div>
-                        </div>
-
-                        {/* Divider */}
-                        <div style={{ height: 1, background: p.divider }} />
-
-                        {/* Theory Overlay */}
-                        <div>
-                            <div className="mb-2.5 text-[10px] font-semibold uppercase tracking-[0.24em]" style={{ fontFamily: "'Rajdhani', sans-serif", color: p.label }}>
-                                Theory Layers
-                            </div>
-
-                            {/* Active layers summary */}
-                            <div className="mb-2 flex flex-col gap-1">
-                                {([
-                                    ["Layer One", theorySettings.layer1Kind],
-                                    ["Layer Two", theorySettings.layer2Kind],
-                                    ["Layer Three", theorySettings.layer3Kind],
-                                ] as [string, LayerKind | null][]).map(([rowLabel, kind]) => {
-                                    const kindLabel = kind
-                                        ? LAYER_GROUPS.flatMap(g => g.options).find(o => o.value === kind)?.label ?? kind
-                                        : null;
-                                    return (
-                                        <div
-                                            key={rowLabel}
-                                            className="flex items-center justify-between rounded-lg px-3 py-2"
-                                            style={{ background: p.rowHover, border: `1px solid ${p.rowBorder}` }}
-                                        >
-                                            <span className="text-[9px] uppercase tracking-[0.14em]" style={{ fontFamily: "'Rajdhani', sans-serif", color: p.label }}>{rowLabel}</span>
-                                            <span className="text-[11px] font-semibold" style={{ fontFamily: "'Rajdhani', sans-serif", color: kindLabel ? p.text : p.inactiveText }}>
-                                                {kindLabel ?? "—"}
-                                            </span>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-
-                            {/* Reset layers */}
-                            <button
-                                type="button"
-                                onClick={() => onTheoryChange(BLANK_THEORY)}
-                                className="mt-2 w-full rounded-lg px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.12em] transition-opacity hover:opacity-70"
-                                style={{
-                                    fontFamily: "'Rajdhani', sans-serif",
-                                    color: p.inactiveText,
-                                    border: `1px dashed ${p.swatchBorder}`,
-                                }}
-                            >
-                                Reset Layers
-                            </button>
                         </div>
 
                         {/* Divider */}
