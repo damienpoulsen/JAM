@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { CURRENT_ANALYSIS_VERSION, saveSongAnalysis, type SongAnalysis } from "../../lib/analysis";
+import { CURRENT_ANALYSIS_VERSION, readStoredSongAnalysis, saveSongAnalysis, type SongAnalysis } from "../../lib/analysis";
 import { type CommunityLong } from "../../lib/supabase";
 import { readSongs, writeSongs } from "../../lib/songs";
 
@@ -53,6 +53,11 @@ export default function LibraryPage() {
   const [loadingId, setLoadingId] = useState<string | null>(null);
   const [activeNav, setActiveNav] = useState<"popular" | "recent">("popular");
   const [showAddModal, setShowAddModal] = useState(false);
+  const [shareSelectedId, setShareSelectedId] = useState<string | null>(null);
+  const [shareArtist, setShareArtist] = useState("");
+  const [shareLoading, setShareLoading] = useState(false);
+  const [shareSuccess, setShareSuccess] = useState(false);
+  const [shareError, setShareError] = useState("");
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const popularRef = useRef<HTMLDivElement>(null);
   const recentRef = useRef<HTMLDivElement>(null);
@@ -127,6 +132,42 @@ export default function LibraryPage() {
   };
 
   const isSearching = query.trim().length > 0;
+
+  const shareableSongs = readSongs().filter(
+    (s) => s.analysisStatus === "ready" && s.youtubeUrl
+  );
+
+  const handleShare = async () => {
+    if (!shareSelectedId) return;
+    const song = shareableSongs.find((s) => s.id === shareSelectedId);
+    if (!song) return;
+    const analysis = readStoredSongAnalysis(shareSelectedId);
+    if (!analysis) { setShareError("No analysis found for this song. Open it in JAM first."); return; }
+    setShareLoading(true);
+    setShareError("");
+    try {
+      const res = await fetch("/api/community/submit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          song_name: song.name,
+          artist: shareArtist.trim() || null,
+          youtube_url: song.youtubeUrl,
+          key: song.key !== "Unknown" ? song.key : null,
+          bpm: typeof song.bpm === "number" ? song.bpm : null,
+          analysis_json: analysis,
+        }),
+      });
+      const data = await res.json() as { id?: string; error?: string };
+      if (!res.ok || data.error) throw new Error(data.error ?? "Failed to submit");
+      setShareSuccess(true);
+      fetchLists();
+    } catch (e) {
+      setShareError(e instanceof Error ? e.message : "Something went wrong");
+    } finally {
+      setShareLoading(false);
+    }
+  };
 
   // ─── Card renderers (inlined to avoid nested component issues) ─────────────
 
@@ -567,6 +608,93 @@ export default function LibraryPage() {
         </div>
       </div>
 
+      {/* ─── Share to Community Modal ─── */}
+      {showAddModal && (
+        <div
+          style={{ position: "fixed", inset: 0, zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.7)", backdropFilter: "blur(6px)" }}
+          onClick={(e) => { if (e.target === e.currentTarget) { setShowAddModal(false); setShareSuccess(false); setShareError(""); setShareSelectedId(null); setShareArtist(""); } }}
+        >
+          <div style={{ width: "100%", maxWidth: 480, borderRadius: 18, background: "rgba(10,6,24,0.98)", border: "1.5px solid rgba(125,55,210,0.45)", boxShadow: "0 24px 80px rgba(0,0,0,0.8), 0 0 40px rgba(110,40,210,0.2)", padding: "28px 28px 24px", position: "relative" }}>
+
+            {/* Close */}
+            <button onClick={() => { setShowAddModal(false); setShareSuccess(false); setShareError(""); setShareSelectedId(null); setShareArtist(""); }} style={{ position: "absolute", top: 16, right: 16, background: "none", border: "none", cursor: "pointer", color: "rgba(165,118,248,0.5)", padding: 4 }}>
+              <svg viewBox="0 0 24 24" width={16} height={16} fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M18 6 6 18M6 6l12 12" /></svg>
+            </button>
+
+            <div style={{ fontFamily: "'Courier Prime', monospace", fontSize: 10, letterSpacing: "0.22em", color: "rgba(165,118,248,0.5)", marginBottom: 8 }}>SHARE TO COMMUNITY</div>
+            <h2 style={{ fontFamily: "'Lora', serif", fontWeight: 700, fontSize: 22, color: "white", margin: "0 0 20px" }}>Add a Song</h2>
+
+            {shareSuccess ? (
+              <div style={{ textAlign: "center", padding: "24px 0" }}>
+                <div style={{ fontSize: 32, marginBottom: 12 }}>✓</div>
+                <div style={{ fontFamily: "'Lora', serif", fontSize: 17, color: "white", marginBottom: 6 }}>Shared to the community!</div>
+                <div style={{ fontFamily: "'Courier Prime', monospace", fontSize: 11, color: "rgba(165,118,248,0.5)", marginBottom: 24 }}>It'll show up in Recently Added.</div>
+                <button onClick={() => { setShowAddModal(false); setShareSuccess(false); setShareSelectedId(null); setShareArtist(""); }} style={{ padding: "9px 22px", borderRadius: 9, background: "rgba(115,45,210,0.3)", border: "1.5px solid rgba(140,70,225,0.55)", color: "white", fontFamily: "'Courier Prime', monospace", fontSize: 12, letterSpacing: "0.1em", cursor: "pointer" }}>
+                  DONE
+                </button>
+              </div>
+            ) : shareableSongs.length === 0 ? (
+              <div style={{ textAlign: "center", padding: "20px 0" }}>
+                <div style={{ fontFamily: "'Lora', serif", fontSize: 15, color: "rgba(255,255,255,0.45)", fontStyle: "italic", marginBottom: 10 }}>No eligible songs found.</div>
+                <div style={{ fontFamily: "'Courier Prime', monospace", fontSize: 11, color: "rgba(165,118,248,0.4)", lineHeight: 1.6 }}>
+                  Import a YouTube song from the home page and fully analyze it first.
+                </div>
+              </div>
+            ) : (
+              <>
+                {/* Song picker */}
+                <div style={{ marginBottom: 16 }}>
+                  <div style={{ fontFamily: "'Courier Prime', monospace", fontSize: 10, letterSpacing: "0.16em", color: "rgba(165,118,248,0.5)", marginBottom: 8 }}>SELECT SONG</div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 200, overflowY: "auto" }}>
+                    {shareableSongs.map((s) => (
+                      <button
+                        key={s.id}
+                        onClick={() => setShareSelectedId(s.id)}
+                        style={{
+                          display: "flex", alignItems: "center", justifyContent: "space-between",
+                          padding: "10px 14px", borderRadius: 10, textAlign: "left", cursor: "pointer",
+                          background: shareSelectedId === s.id ? "rgba(125,55,210,0.25)" : "rgba(255,255,255,0.04)",
+                          border: `1.5px solid ${shareSelectedId === s.id ? "rgba(155,90,255,0.55)" : "rgba(125,55,210,0.2)"}`,
+                          transition: "background 0.12s, border-color 0.12s",
+                        }}
+                      >
+                        <div style={{ fontFamily: "'Lora', serif", fontSize: 14, color: "white" }}>{s.name}</div>
+                        <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                          {s.key && s.key !== "Unknown" && <span style={{ fontFamily: "'Courier Prime', monospace", fontSize: 10, color: "rgba(185,145,255,0.7)", background: "rgba(115,45,210,0.2)", border: "1px solid rgba(140,70,225,0.3)", borderRadius: 4, padding: "1px 6px" }}>{s.key}</span>}
+                          {typeof s.bpm === "number" && <span style={{ fontFamily: "'Courier Prime', monospace", fontSize: 10, color: "rgba(185,145,255,0.7)", background: "rgba(115,45,210,0.2)", border: "1px solid rgba(140,70,225,0.3)", borderRadius: 4, padding: "1px 6px" }}>{Math.round(s.bpm)} BPM</span>}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Artist field */}
+                <div style={{ marginBottom: 20 }}>
+                  <div style={{ fontFamily: "'Courier Prime', monospace", fontSize: 10, letterSpacing: "0.16em", color: "rgba(165,118,248,0.5)", marginBottom: 8 }}>ARTIST <span style={{ color: "rgba(165,118,248,0.3)" }}>(optional)</span></div>
+                  <input
+                    value={shareArtist}
+                    onChange={(e) => setShareArtist(e.target.value)}
+                    placeholder="e.g. Arctic Monkeys"
+                    style={{ width: "100%", padding: "10px 14px", borderRadius: 10, background: "rgba(13,8,30,0.95)", border: "1.5px solid rgba(125,55,210,0.35)", color: "white", fontFamily: "'Lora', serif", fontSize: 14, outline: "none", boxSizing: "border-box" }}
+                  />
+                </div>
+
+                {shareError && (
+                  <div style={{ fontFamily: "'Courier Prime', monospace", fontSize: 11, color: "rgba(255,100,100,0.8)", marginBottom: 14 }}>{shareError}</div>
+                )}
+
+                <button
+                  onClick={handleShare}
+                  disabled={!shareSelectedId || shareLoading}
+                  style={{ width: "100%", padding: "12px", borderRadius: 11, background: shareSelectedId ? "rgba(115,45,210,0.4)" : "rgba(115,45,210,0.15)", border: `1.5px solid ${shareSelectedId ? "rgba(155,90,255,0.6)" : "rgba(125,55,210,0.25)"}`, color: shareSelectedId ? "white" : "rgba(255,255,255,0.3)", fontFamily: "'Courier Prime', monospace", fontSize: 13, fontWeight: 700, letterSpacing: "0.12em", cursor: shareSelectedId && !shareLoading ? "pointer" : "not-allowed", transition: "background 0.15s" }}
+                >
+                  {shareLoading ? "SHARING…" : "SHARE TO COMMUNITY"}
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </>
   );
 }
