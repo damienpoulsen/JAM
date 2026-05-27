@@ -399,7 +399,7 @@ def detect_key_from_chromagram(audio_path: Path) -> str | None:
     errors, making it a reliable cross-check against infer_key_from_segments.
     """
     try:
-        signal, sample_rate = librosa.load(audio_path, sr=22050, mono=True)
+        signal, sample_rate = librosa.load(audio_path, sr=22050, mono=True, duration=300)
         harmonic = librosa.effects.harmonic(signal, margin=4)
         chroma = librosa.feature.chroma_cqt(y=harmonic, sr=sample_rate, bins_per_octave=36)
         chroma_mean = np.mean(chroma, axis=1)  # 12-element pitch-class profile
@@ -634,7 +634,7 @@ def separate_for_chords(audio_path: Path, mode: str) -> "Path | None":
     if mode in ("hpss", "demucs"):
         try:
             import soundfile as sf
-            signal, sr = librosa.load(audio_path, sr=22050, mono=True)
+            signal, sr = librosa.load(audio_path, sr=22050, mono=True, duration=300)
             y_harmonic, _ = librosa.effects.hpss(signal)
             tmp = Path(tempfile.mktemp(suffix=".wav"))
             sf.write(str(tmp), y_harmonic, sr)
@@ -692,7 +692,7 @@ def _detect_chords_lvchordia(audio_path: Path) -> list[dict[str, Any]]:
 
 def _detect_chords_librosa(audio_path: Path) -> list[dict[str, Any]]:
     """Chromagram template-matching chord detection — no torch required."""
-    y, sr = librosa.load(str(audio_path), sr=22050, mono=True)
+    y, sr = librosa.load(str(audio_path), sr=22050, mono=True, duration=300)
     hop_length = 4096  # ~0.186 s/frame at 22050 Hz
 
     chroma = librosa.feature.chroma_cqt(y=y, sr=sr, hop_length=hop_length, bins_per_octave=36)
@@ -908,7 +908,7 @@ def _refine_chord_starts_with_onsets(
         return segments
 
     try:
-        signal, sr = librosa.load(audio_path, sr=22050, mono=True)
+        signal, sr = librosa.load(audio_path, sr=22050, mono=True, duration=300)
         # Harmonic component isolates pitched onsets from any remaining transients
         harmonic = librosa.effects.harmonic(signal, margin=3)
         onset_frames = librosa.onset.onset_detect(
@@ -1226,7 +1226,7 @@ def _to_wav_for_madmom(audio_path: Path) -> tuple[Path, bool]:
     mono 44100 Hz PCM WAV to avoid all of these edge cases.
     """
     import soundfile as sf
-    signal, _ = librosa.load(audio_path, sr=44100, mono=True)
+    signal, _ = librosa.load(audio_path, sr=44100, mono=True, duration=300)
     tmp = Path(tempfile.mktemp(suffix=".wav"))
     sf.write(str(tmp), signal, 44100, subtype="PCM_16")
     return tmp, True
@@ -1266,7 +1266,7 @@ def _detect_beats_madmom(audio_path: Path) -> tuple[float | None, float | None, 
 
 
 def _analyze_bpm_and_beats_librosa(audio_path: Path) -> tuple[float | None, float | None, np.ndarray]:
-    signal, sample_rate = librosa.load(audio_path, sr=22050, mono=True)
+    signal, sample_rate = librosa.load(audio_path, sr=22050, mono=True, duration=300)
     _, percussive = librosa.effects.hpss(signal)
 
     # Percussive onset: strong for drums/transients
