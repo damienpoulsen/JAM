@@ -157,7 +157,7 @@ export default function PrepareJamPage({ params }: { params: Promise<{ id: strin
   useEffect(() => {
     if (phase !== "fetching") return;
     const song = readSongs().find((s) => s.id === id);
-    if (!song?.youtubeUrl) { setPhase("choose"); return; }
+    if (!song?.youtubeUrl) { setPhase("analyzing"); return; }
 
     const fetchAudio = async () => {
       try {
