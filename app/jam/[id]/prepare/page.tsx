@@ -315,7 +315,7 @@ export default function PrepareJamPage({ params }: { params: Promise<{ id: strin
     hasAnalyzedRef.current = false;
     updateStoredSong(id, { analysisStatus: "pending" });
     const song = readSongs().find((s) => s.id === id);
-    setPhase(song?.youtubeUrl ? "fetching" : "choose");
+    setPhase(song?.youtubeUrl ? "fetching" : "analyzing");
   };
 
   return (
