@@ -21,6 +21,8 @@ RUN npm ci
 COPY scripts/requirements-prototype.txt /app/scripts/requirements-prototype.txt
 RUN python3 -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
+# Install CPU-only torch first — prevents lv-chordia from pulling in the 2GB+ CUDA wheel
+RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu
 RUN pip install --no-cache-dir -r /app/scripts/requirements-prototype.txt \
     && pip install --no-cache-dir fastapi "uvicorn[standard]" python-multipart
 RUN pip install --no-cache-dir --upgrade yt-dlp pytubefix bgutil-ytdlp-pot-provider
