@@ -22,14 +22,6 @@ const PHASES_HPSS: ProgressPhase[] = [
   { label: "Finalizing",           targetPct: 92, durationMs: 3000  },
 ];
 
-const PHASES_DEMUCS: ProgressPhase[] = [
-  { label: "Loading audio",        targetPct:  3, durationMs:  3000 },
-  { label: "Loading stem model",   targetPct: 18, durationMs: 15000 },
-  { label: "Separating stems",     targetPct: 55, durationMs: 80000 },
-  { label: "Detecting chords",     targetPct: 75, durationMs: 30000 },
-  { label: "Analyzing rhythm",     targetPct: 88, durationMs: 15000 },
-  { label: "Finalizing",           targetPct: 92, durationMs: 10000 },
-];
 
 const PUBLIC_ANALYSIS_API_URL = process.env.NEXT_PUBLIC_ANALYSIS_API_URL?.replace(/\/$/, "") ?? "";
 
@@ -84,8 +76,7 @@ function updateStoredSong(songId: string, patch: Partial<Song>) {
   return nextSong;
 }
 
-type Phase = "checking" | "fetching" | "choose" | "analyzing" | "done" | "error";
-type StemMode = "hpss" | "demucs";
+type Phase = "checking" | "fetching" | "analyzing" | "done" | "error";
 
 export default function PrepareJamPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -95,7 +86,7 @@ export default function PrepareJamPage({ params }: { params: Promise<{ id: strin
   const [songName, setSongName] = useState("Preparing track");
   const [errorMessage, setErrorMessage] = useState("");
   const [phase, setPhase] = useState<Phase>("checking");
-  const [stemMode, setStemMode] = useState<StemMode>("demucs");
+  const stemMode = "hpss";
   const [progress, setProgress] = useState(0);
   const [phaseLabel, setPhaseLabel] = useState("Loading…");
   const completedAnalysisRef = useRef<SongAnalysis | null>(null);
@@ -156,7 +147,7 @@ export default function PrepareJamPage({ params }: { params: Promise<{ id: strin
       }
 
       // No cache — show the quality-choice screen
-      setPhase("choose");
+      setPhase("analyzing");
     };
 
     void init();
@@ -189,7 +180,7 @@ export default function PrepareJamPage({ params }: { params: Promise<{ id: strin
         if (refreshed?.analysisStatus === "ready") {
           router.replace(`/jam/${id}`);
         } else {
-          setPhase("choose");
+          setPhase("analyzing");
         }
       } catch (err) {
         setErrorMessage(err instanceof Error ? err.message : "Failed to fetch audio from YouTube.");
@@ -276,7 +267,7 @@ export default function PrepareJamPage({ params }: { params: Promise<{ id: strin
       return;
     }
 
-    const phases = stemMode === "demucs" ? PHASES_DEMUCS : PHASES_HPSS;
+    const phases = PHASES_HPSS;
     const startTime = Date.now();
 
     const tick = () => {
@@ -318,10 +309,6 @@ export default function PrepareJamPage({ params }: { params: Promise<{ id: strin
     };
   }, [phase, stemMode]);
 
-  const startAnalysis = (mode: StemMode) => {
-    setStemMode(mode);
-    setPhase("analyzing");
-  };
 
   const handleRetry = () => {
     setErrorMessage("");
@@ -444,92 +431,6 @@ export default function PrepareJamPage({ params }: { params: Promise<{ id: strin
                 </>
             </div>
 
-          ) : phase === "choose" ? (
-            /* ── Quality choice screen ── */
-            <div className="w-full text-center">
-
-              {/* JAM divider */}
-              <div className="flex items-center justify-center gap-4 mb-6">
-                <div style={{ height: 1, width: 48, background: "linear-gradient(to right, transparent, rgba(120,60,200,0.55))" }} />
-                <span style={{ fontFamily: "'Courier Prime', monospace", fontSize: 11, fontWeight: 700, letterSpacing: "0.28em", color: "rgba(160,120,220,0.7)" }}>JAM</span>
-                <div style={{ height: 1, width: 48, background: "linear-gradient(to left, transparent, rgba(120,60,200,0.55))" }} />
-              </div>
-
-              <p style={{ fontFamily: "'Courier Prime', monospace", fontSize: 11, fontWeight: 700, letterSpacing: "0.22em", color: "rgba(165,118,248,0.55)", marginBottom: 10 }}>
-                CHORD DETECTION QUALITY
-              </p>
-              <h1 style={{ fontFamily: "'Lora', serif", fontWeight: 700, fontSize: "clamp(22px, 4vw, 34px)", color: "#ffffff", margin: "0 0 8px", lineHeight: 1.15 }}>
-                {songName}
-              </h1>
-              <p style={{ fontFamily: "'Lora', serif", fontSize: 14, color: "rgba(165,118,248,0.45)", fontStyle: "italic", marginBottom: 36 }}>
-                How thoroughly should JAM isolate harmonics before detecting chords?
-              </p>
-
-              {/* Mode cards */}
-              <div className="flex gap-4">
-                {/* Fast — HPSS */}
-                <button
-                  type="button"
-                  onClick={() => startAnalysis("hpss")}
-                  className="mode-card flex-1 rounded-2xl px-6 py-7 text-left"
-                  style={{
-                    background: "rgba(10,6,22,0.97)",
-                    border: "1.5px solid rgba(125,55,210,0.55)",
-                    boxShadow: "0 6px 32px rgba(0,0,0,0.65), 0 0 24px rgba(110,40,210,0.14)",
-                  }}
-                >
-                  <div className="mb-4 flex items-center justify-center w-10 h-10 rounded-xl" style={{ background: "rgba(115,45,210,0.22)", border: "1.5px solid rgba(140,70,225,0.4)" }}>
-                    <svg viewBox="0 0 24 24" width={18} height={18} fill="none" stroke="rgba(185,135,255,0.9)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
-                    </svg>
-                  </div>
-                  <div style={{ fontFamily: "'Lora', serif", fontWeight: 700, fontSize: 18, color: "#ffffff", marginBottom: 4 }}>
-                    Fast
-                  </div>
-                  <div style={{ fontFamily: "'Courier Prime', monospace", fontSize: 11, fontWeight: 700, letterSpacing: "0.14em", color: "rgba(165,118,248,0.7)", marginBottom: 16 }}>
-                    ~30 SECONDS
-                  </div>
-                  <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 6 }}>
-                    {["Removes drum transients", "Vocals remain in signal", "Good for instrumental tracks"].map(item => (
-                      <li key={item} style={{ fontFamily: "'Lora', serif", fontSize: 13, color: "rgba(255,255,255,0.45)", fontStyle: "italic" }}>{item}</li>
-                    ))}
-                  </ul>
-                </button>
-
-                {/* Accurate — Demucs */}
-                <button
-                  type="button"
-                  onClick={() => startAnalysis("demucs")}
-                  className="mode-card flex-1 rounded-2xl px-6 py-7 text-left"
-                  style={{
-                    background: "rgba(10,6,22,0.97)",
-                    border: "1.5px solid rgba(125,55,210,0.55)",
-                    boxShadow: "0 6px 32px rgba(0,0,0,0.65), 0 0 24px rgba(110,40,210,0.14)",
-                  }}
-                >
-                  <div className="mb-4 flex items-center justify-center w-10 h-10 rounded-xl" style={{ background: "rgba(115,45,210,0.22)", border: "1.5px solid rgba(140,70,225,0.4)" }}>
-                    <svg viewBox="0 0 24 24" width={18} height={18} fill="none" stroke="rgba(185,135,255,0.9)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M12 2a10 10 0 1 0 10 10" /><path d="M12 6v6l4 2" />
-                    </svg>
-                  </div>
-                  <div style={{ fontFamily: "'Lora', serif", fontWeight: 700, fontSize: 18, color: "#ffffff", marginBottom: 4 }}>
-                    Accurate
-                  </div>
-                  <div style={{ fontFamily: "'Courier Prime', monospace", fontSize: 11, fontWeight: 700, letterSpacing: "0.14em", color: "rgba(165,118,248,0.7)", marginBottom: 4 }}>
-                    ~2–4 MINUTES
-                  </div>
-                  <div style={{ fontFamily: "'Courier Prime', monospace", fontSize: 11, color: "rgba(165,118,248,0.3)", marginBottom: 12 }}>
-                    first run downloads ~320 MB model
-                  </div>
-                  <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 6 }}>
-                    {["Removes drums & vocals", "Isolates bass + instruments", "Best for vocal-heavy tracks"].map(item => (
-                      <li key={item} style={{ fontFamily: "'Lora', serif", fontSize: 13, color: "rgba(255,255,255,0.45)", fontStyle: "italic" }}>{item}</li>
-                    ))}
-                  </ul>
-                </button>
-              </div>
-            </div>
-
           ) : (
             /* ── Loading / error screen ── */
             <div className="w-full max-w-md text-center">
@@ -582,12 +483,7 @@ export default function PrepareJamPage({ params }: { params: Promise<{ id: strin
               ) : (
                 <>
                   <p style={{ fontFamily: "'Lora', serif", fontSize: 13, color: "rgba(165,118,248,0.4)", fontStyle: "italic", marginBottom: 8, lineHeight: 1.6 }}>
-                    {stemMode === "demucs"
-                      ? "Separating stems and building chord data. This takes a few minutes — worth the wait."
-                      : "Building BPM and chord data for your first session."}
-                  </p>
-                  <p style={{ fontFamily: "'Courier Prime', monospace", fontSize: 11, color: "rgba(165,118,248,0.25)", letterSpacing: "0.1em", marginBottom: 28 }}>
-                    {stemMode === "demucs" ? "MODE: ACCURATE (DEMUCS)" : "MODE: FAST (HPSS)"}
+                    Building BPM and chord data for your session.
                   </p>
 
                   <div className="mx-auto w-full max-w-[300px]">
