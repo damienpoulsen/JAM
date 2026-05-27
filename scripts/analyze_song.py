@@ -690,6 +690,56 @@ def _detect_chords_lvchordia(audio_path: Path) -> list[dict[str, Any]]:
     return chord_recognition(str(audio_path), chord_dict_name="submission")  # type: ignore[return-value]
 
 
+def _detect_chords_librosa(audio_path: Path) -> list[dict[str, Any]]:
+    """Chromagram template-matching chord detection — no torch required."""
+    y, sr = librosa.load(str(audio_path), sr=22050, mono=True)
+    hop_length = 4096  # ~0.186 s/frame at 22050 Hz
+
+    chroma = librosa.feature.chroma_cqt(y=y, sr=sr, hop_length=hop_length, bins_per_octave=36)
+
+    ROOTS = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
+
+    def _tmpl(root_idx: int, intervals: list[int]) -> np.ndarray:
+        t = np.zeros(12)
+        for iv in intervals:
+            t[(root_idx + iv) % 12] = 1.0
+        n = np.linalg.norm(t)
+        return t / n if n else t
+
+    templates = [_tmpl(i, [0, 4, 7]) for i in range(12)] + [_tmpl(i, [0, 3, 7]) for i in range(12)]
+    chord_labels = ROOTS + [r + "m" for r in ROOTS]
+
+    frame_times = librosa.frames_to_time(np.arange(chroma.shape[1]), sr=sr, hop_length=hop_length)
+    duration = float(librosa.get_duration(y=y, sr=sr))
+
+    frame_chords: list[str] = []
+    for frame in chroma.T:
+        nrm = np.linalg.norm(frame)
+        if nrm < 0.05:
+            frame_chords.append("N")
+        else:
+            scores = [float(np.dot(frame / nrm, t)) for t in templates]
+            frame_chords.append(chord_labels[int(np.argmax(scores))])
+
+    segments: list[dict[str, Any]] = []
+    if not frame_chords:
+        return segments
+
+    cur_chord = frame_chords[0]
+    cur_start = float(frame_times[0])
+    for i in range(1, len(frame_chords)):
+        if frame_chords[i] != cur_chord:
+            end_t = float(frame_times[i])
+            if cur_chord != "N" and end_t > cur_start:
+                segments.append({"start_time": round(cur_start, 3), "end_time": round(end_t, 3), "chord": cur_chord})
+            cur_chord = frame_chords[i]
+            cur_start = float(frame_times[i])
+    if cur_chord != "N" and duration > cur_start:
+        segments.append({"start_time": round(cur_start, 3), "end_time": round(duration, 3), "chord": cur_chord})
+
+    return segments
+
+
 def _chord_root(label: str) -> str:
     """Extract just the root note from a chord label (e.g. 'Am7' → 'A', 'F#m' → 'F#')."""
     if not label or label == "N":
@@ -936,6 +986,13 @@ def detect_chord_events(
         print("[chords] lv_chordia OK", file=sys.stderr)
     except Exception as exc:
         print(f"[chords] lv_chordia failed ({exc})", file=sys.stderr)
+
+    if not madmom_segs and not lv_segs:
+        try:
+            lv_segs = _detect_chords_librosa(chord_source)
+            print("[chords] librosa chromagram OK", file=sys.stderr)
+        except Exception as exc:
+            print(f"[chords] librosa fallback failed ({exc})", file=sys.stderr)
 
     # Keep tmp_file alive — onset refinement needs chord_source after this block
 
