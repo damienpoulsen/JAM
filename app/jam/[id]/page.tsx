@@ -1170,6 +1170,24 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
 
     return (
         <div className="relative h-screen overflow-hidden" style={{ fontFamily: "'IBM Plex Mono', monospace", backgroundColor: bgMode === "gradient" ? "#000000" : bgColor, color: "white" }}>
+            <div
+                className="fixed bottom-3 left-3 z-[9999] pointer-events-none select-none"
+                style={{
+                    fontFamily: "'Rajdhani', sans-serif",
+                    fontSize: "10px",
+                    fontWeight: 700,
+                    letterSpacing: "0.22em",
+                    color: "rgba(255,255,255,0.38)",
+                    textTransform: "uppercase",
+                    border: "1px solid rgba(255,255,255,0.10)",
+                    borderRadius: "3px",
+                    padding: "2px 6px",
+                    background: "rgba(0,0,0,0.28)",
+                    backdropFilter: "blur(4px)",
+                }}
+            >
+                Public Beta
+            </div>
           <style>{`@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;0,800;0,900;1,400;1,700&family=Lora:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Courier+Prime:ital,wght@0,400;0,700;1,400&display=swap');`}</style>
             {bgMode === "gradient" && (
                 <div

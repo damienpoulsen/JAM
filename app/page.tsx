@@ -287,6 +287,24 @@ export default function Home() {
 
   return (
     <>
+      <div
+        className="fixed bottom-3 left-3 z-[9999] pointer-events-none select-none"
+        style={{
+          fontFamily: "'Rajdhani', sans-serif",
+          fontSize: "10px",
+          fontWeight: 700,
+          letterSpacing: "0.22em",
+          color: "rgba(255,255,255,0.38)",
+          textTransform: "uppercase",
+          border: "1px solid rgba(255,255,255,0.10)",
+          borderRadius: "3px",
+          padding: "2px 6px",
+          background: "rgba(0,0,0,0.28)",
+          backdropFilter: "blur(4px)",
+        }}
+      >
+        Public Beta
+      </div>
       {/* Tour welcome modal */}
       {tourModalOpen && (
         <div
