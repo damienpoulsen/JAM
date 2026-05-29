@@ -691,11 +691,32 @@ def _detect_chords_lvchordia(audio_path: Path) -> list[dict[str, Any]]:
 
 
 def _detect_chords_librosa(audio_path: Path) -> list[dict[str, Any]]:
-    """Chromagram template-matching chord detection — no torch required."""
+    """Onset-gated chromagram chord detection — no torch required.
+
+    Chord changes are only emitted at detected onsets (strums, note attacks).
+    Between onsets the previous chord is held, which prevents spurious changes
+    during sustained notes, drones, and ambience — the most common source of
+    chord spam in the librosa fallback.
+    """
     y, sr = librosa.load(str(audio_path), sr=22050, mono=True, duration=300)
-    hop_length = 8192  # ~0.37s/frame — coarser grid eliminates single-frame chord flickers
+    hop_length = 8192  # ~0.37s/frame
 
     chroma = librosa.feature.chroma_cqt(y=y, sr=sr, hop_length=hop_length, bins_per_octave=36)
+    chroma_times = librosa.frames_to_time(np.arange(chroma.shape[1]), sr=sr, hop_length=hop_length)
+    duration = float(librosa.get_duration(y=y, sr=sr))
+
+    # Detect onsets at a finer resolution, then flag which chroma frames have
+    # a nearby onset. A chord change is only valid when the guitarist actually
+    # played something — drones and sustained notes have no strumming onset.
+    onset_hop = 2048
+    onset_frames = librosa.onset.onset_detect(
+        y=y, sr=sr, hop_length=onset_hop, backtrack=True, units="frames"
+    )
+    onset_times = librosa.frames_to_time(onset_frames, sr=sr, hop_length=onset_hop)
+    frame_duration = hop_length / sr  # seconds per chroma frame
+    onset_near = np.zeros(len(chroma_times), dtype=bool)
+    for ot in onset_times:
+        onset_near |= np.abs(chroma_times - ot) <= frame_duration * 0.65
 
     ROOTS = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
 
@@ -709,19 +730,12 @@ def _detect_chords_librosa(audio_path: Path) -> list[dict[str, Any]]:
     templates = [_tmpl(i, [0, 4, 7]) for i in range(12)] + [_tmpl(i, [0, 3, 7]) for i in range(12)]
     chord_labels = ROOTS + [r + "m" for r in ROOTS]
 
-    frame_times = librosa.frames_to_time(np.arange(chroma.shape[1]), sr=sr, hop_length=hop_length)
-    duration = float(librosa.get_duration(y=y, sr=sr))
-
-    # Silence and confidence thresholds.
-    # Below SILENCE_THRESHOLD the frame has no real harmonic content.
-    # Below CONFIDENCE_THRESHOLD the best template match is too weak — hold the
-    # previous chord instead of emitting a spurious change ("sticky chord").
     SILENCE_THRESHOLD = 0.10
-    CONFIDENCE_THRESHOLD = 0.60
+    CONFIDENCE_THRESHOLD = 0.55
 
     frame_chords: list[str] = []
     prev_chord = "N"
-    for frame in chroma.T:
+    for i, frame in enumerate(chroma.T):
         nrm = np.linalg.norm(frame)
         if nrm < SILENCE_THRESHOLD:
             frame_chords.append("N")
@@ -729,12 +743,12 @@ def _detect_chords_librosa(audio_path: Path) -> list[dict[str, Any]]:
             continue
         scores = [float(np.dot(frame / nrm, t)) for t in templates]
         best_idx = int(np.argmax(scores))
-        if scores[best_idx] >= CONFIDENCE_THRESHOLD:
+        if onset_near[i] and scores[best_idx] >= CONFIDENCE_THRESHOLD:
             detected = chord_labels[best_idx]
             frame_chords.append(detected)
             prev_chord = detected
         else:
-            # Low confidence — hold previous chord to avoid spam on ambiguous frames
+            # No nearby onset or low confidence — hold previous chord
             frame_chords.append(prev_chord)
 
     segments: list[dict[str, Any]] = []
@@ -742,14 +756,14 @@ def _detect_chords_librosa(audio_path: Path) -> list[dict[str, Any]]:
         return segments
 
     cur_chord = frame_chords[0]
-    cur_start = float(frame_times[0])
+    cur_start = float(chroma_times[0])
     for i in range(1, len(frame_chords)):
         if frame_chords[i] != cur_chord:
-            end_t = float(frame_times[i])
+            end_t = float(chroma_times[i])
             if cur_chord != "N" and end_t > cur_start:
                 segments.append({"start_time": round(cur_start, 3), "end_time": round(end_t, 3), "chord": cur_chord})
             cur_chord = frame_chords[i]
-            cur_start = float(frame_times[i])
+            cur_start = float(chroma_times[i])
     if cur_chord != "N" and duration > cur_start:
         segments.append({"start_time": round(cur_start, 3), "end_time": round(duration, 3), "chord": cur_chord})
 
