@@ -24,6 +24,7 @@ from analyze_song import (  # noqa: E402
     analyze_bpm_and_beats,
     detect_chord_events,
     extract_instrumental,
+    filter_short_chord_events,
     snap_chord_events_to_beats,
 )
 
@@ -89,6 +90,12 @@ async def analyze(
 
                 if chord_events and len(beat_times) >= 2 and bpm is not None:
                     chord_events = snap_chord_events_to_beats(chord_events, beat_times, bpm)
+
+                # Final pass: drop any chord change closer than 3/4 of a beat.
+                # This is the last line of defence against rapid-fire spam after
+                # all other smoothing has run.
+                if chord_events and bpm is not None:
+                    chord_events = filter_short_chord_events(chord_events, bpm, min_beats=0.75)
 
                 return {
                     "songId": songId,

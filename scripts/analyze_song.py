@@ -82,8 +82,8 @@ def normalize_lv_chord_label(label: str) -> str:
     return normalized or root
 
 
-MIN_CHORD_SEGMENT_SECONDS = 0.35
-BRIDGE_CHORD_MAX_SECONDS = 0.15
+MIN_CHORD_SEGMENT_SECONDS = 0.75   # raised from 0.35 — pairs of librosa frames (0.37s each) no longer survive
+BRIDGE_CHORD_MAX_SECONDS = 0.25    # raised from 0.15 — absorbs slightly longer transition blips
 BPM_VALID_MIN = 55.0
 BPM_VALID_MAX = 220.0
 BPM_PREFERRED_MIN = 84.0
@@ -693,7 +693,7 @@ def _detect_chords_lvchordia(audio_path: Path) -> list[dict[str, Any]]:
 def _detect_chords_librosa(audio_path: Path) -> list[dict[str, Any]]:
     """Chromagram template-matching chord detection — no torch required."""
     y, sr = librosa.load(str(audio_path), sr=22050, mono=True, duration=300)
-    hop_length = 4096  # ~0.186 s/frame at 22050 Hz
+    hop_length = 8192  # ~0.37s/frame — coarser grid eliminates single-frame chord flickers
 
     chroma = librosa.feature.chroma_cqt(y=y, sr=sr, hop_length=hop_length, bins_per_octave=36)
 
@@ -712,14 +712,30 @@ def _detect_chords_librosa(audio_path: Path) -> list[dict[str, Any]]:
     frame_times = librosa.frames_to_time(np.arange(chroma.shape[1]), sr=sr, hop_length=hop_length)
     duration = float(librosa.get_duration(y=y, sr=sr))
 
+    # Silence and confidence thresholds.
+    # Below SILENCE_THRESHOLD the frame has no real harmonic content.
+    # Below CONFIDENCE_THRESHOLD the best template match is too weak — hold the
+    # previous chord instead of emitting a spurious change ("sticky chord").
+    SILENCE_THRESHOLD = 0.10
+    CONFIDENCE_THRESHOLD = 0.60
+
     frame_chords: list[str] = []
+    prev_chord = "N"
     for frame in chroma.T:
         nrm = np.linalg.norm(frame)
-        if nrm < 0.05:
+        if nrm < SILENCE_THRESHOLD:
             frame_chords.append("N")
+            prev_chord = "N"
+            continue
+        scores = [float(np.dot(frame / nrm, t)) for t in templates]
+        best_idx = int(np.argmax(scores))
+        if scores[best_idx] >= CONFIDENCE_THRESHOLD:
+            detected = chord_labels[best_idx]
+            frame_chords.append(detected)
+            prev_chord = detected
         else:
-            scores = [float(np.dot(frame / nrm, t)) for t in templates]
-            frame_chords.append(chord_labels[int(np.argmax(scores))])
+            # Low confidence — hold previous chord to avoid spam on ambiguous frames
+            frame_chords.append(prev_chord)
 
     segments: list[dict[str, Any]] = []
     if not frame_chords:
@@ -1162,6 +1178,32 @@ def infer_beat_start_time(
 
     anchor_time = float(usable_times[best_phase])
     return anchor_time - (best_phase * beat_duration)
+
+
+def filter_short_chord_events(
+    events: list[dict[str, Any]],
+    bpm: float,
+    min_beats: float = 0.75,
+) -> list[dict[str, Any]]:
+    """Last-pass filter: drop chord changes that land too close together.
+
+    Applied after beat-snapping so we work on clean beat-aligned timestamps.
+    Any chord that would last less than min_beats × beat_interval is discarded
+    and the previous chord extends through it — exactly like a human drummer
+    ignoring a ghost note.
+    """
+    if not events or bpm <= 0:
+        return events
+
+    beat_interval = 60.0 / bpm
+    min_gap = max(MIN_CHORD_SEGMENT_SECONDS, beat_interval * min_beats)
+
+    result: list[dict[str, Any]] = [events[0]]
+    for event in events[1:]:
+        if float(event["time"]) - float(result[-1]["time"]) >= min_gap:
+            result.append(event)
+
+    return result
 
 
 def snap_chord_events_to_beats(
