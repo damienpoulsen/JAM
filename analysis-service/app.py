@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import asyncio
 import gc
 import os
 import shutil
 import tempfile
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from fastapi import BackgroundTasks, FastAPI, File, Form, HTTPException, UploadFile
@@ -41,6 +43,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Only one analysis job runs at a time — prevents OOM when multiple users upload simultaneously.
+# Requests queue up and wait rather than crashing the service.
+_analysis_semaphore = asyncio.Semaphore(1)
+_analysis_executor = ThreadPoolExecutor(max_workers=1)
+
 
 @app.get("/health")
 def health_check():
@@ -65,31 +72,37 @@ async def analyze(
         should_detect_chords = str(detectChords).lower() == "true"
         should_skip_bpm = str(skipBpm).lower() == "true"
 
-        if should_skip_bpm:
-            bpm, beat_start_time, beat_times = None, None, []
-        else:
-            bpm, beat_start_time, beat_times = analyze_bpm_and_beats(temp_path)
+        async with _analysis_semaphore:
+            loop = asyncio.get_event_loop()
 
-        chord_events, detected_key = detect_chord_events(
-            audio_path=temp_path,
-            detect_chords=should_detect_chords,
-            stem_mode="hpss",
-        )
+            def _run_analysis():
+                if should_skip_bpm:
+                    bpm, beat_start_time, beat_times = None, None, []
+                else:
+                    bpm, beat_start_time, beat_times = analyze_bpm_and_beats(temp_path)
 
-        if chord_events and len(beat_times) >= 2 and bpm is not None:
-            chord_events = snap_chord_events_to_beats(chord_events, beat_times, bpm)
+                chord_events, detected_key = detect_chord_events(
+                    audio_path=temp_path,
+                    detect_chords=should_detect_chords,
+                    stem_mode="hpss",
+                )
 
-        return JSONResponse(
-            {
-                "songId": songId,
-                "bpm": bpm,
-                "beatStartTime": beat_start_time,
-                "detectedKey": detected_key,
-                "chordEvents": chord_events,
-                "source": "ai",
-                "version": CURRENT_ANALYSIS_VERSION,
-            }
-        )
+                if chord_events and len(beat_times) >= 2 and bpm is not None:
+                    chord_events = snap_chord_events_to_beats(chord_events, beat_times, bpm)
+
+                return {
+                    "songId": songId,
+                    "bpm": bpm,
+                    "beatStartTime": beat_start_time,
+                    "detectedKey": detected_key,
+                    "chordEvents": chord_events,
+                    "source": "ai",
+                    "version": CURRENT_ANALYSIS_VERSION,
+                }
+
+            result = await loop.run_in_executor(_analysis_executor, _run_analysis)
+
+        return JSONResponse(result)
     except Exception as error:
         raise HTTPException(status_code=500, detail=str(error)) from error
     finally:
