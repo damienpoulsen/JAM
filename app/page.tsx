@@ -58,6 +58,9 @@ export default function Home() {
 
   // Inline audio preview state
   const [playingId, setPlayingId] = useState<string | null>(null);
+  const [keyPickerOpen, setKeyPickerOpen] = useState(false);
+  const [keyPickerNote, setKeyPickerNote] = useState<string | null>(null);
+  const [keyPickerSongId, setKeyPickerSongId] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const audioBlobUrl = useRef<string | null>(null);
 
@@ -275,9 +278,11 @@ export default function Home() {
   const handleChangeKey = () => {
     const openSong = getOpenSong();
     if (!openSong) return;
-    const nextKey = window.prompt("Set key", openSong.key);
-    if (nextKey === null) return;
-    updateSong(openSong.id, { key: nextKey.trim() || "Unknown" });
+    setKeyPickerSongId(openSong.id);
+    setKeyPickerNote(null);
+    setKeyPickerOpen(true);
+    setOpenMenuIndex(null);
+    setMenuPosition(null);
   };
 
   return (
@@ -1047,6 +1052,68 @@ export default function Home() {
             </button>
           </div>
         )}
+      {/* Key picker modal */}
+      {keyPickerOpen && (
+        <div
+          className="fixed inset-0 z-[9999] flex items-center justify-center"
+          style={{ background: "rgba(0,0,0,0.72)", backdropFilter: "blur(8px)" }}
+          onClick={() => { setKeyPickerOpen(false); setKeyPickerNote(null); }}
+        >
+          <div
+            className="rounded-2xl p-5"
+            style={{ width: 240, background: "rgba(12,7,3,0.97)", border: "1px solid rgba(120,60,200,0.28)", boxShadow: "0 20px 50px rgba(0,0,0,0.7)" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {!keyPickerNote ? (
+              <>
+                <div className="mb-3 text-[10px] uppercase tracking-[0.16em]" style={{ fontFamily: "'Rajdhani', sans-serif", color: "rgba(190,160,230,0.55)" }}>Select Root Note</div>
+                <div className="grid grid-cols-4 gap-1.5">
+                  {["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"].map((note) => (
+                    <button
+                      key={note}
+                      type="button"
+                      onClick={() => setKeyPickerNote(note)}
+                      className="rounded-lg border py-2 text-sm font-semibold transition"
+                      style={{ fontFamily: "'Rajdhani', sans-serif", borderColor: "rgba(120,60,200,0.25)", background: "rgba(120,60,200,0.08)", color: "#f5ede0" }}
+                    >
+                      {note}
+                    </button>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setKeyPickerNote(null)}
+                  className="mb-3 text-[10px] uppercase tracking-[0.16em]"
+                  style={{ fontFamily: "'Rajdhani', sans-serif", color: "rgba(190,160,230,0.55)", background: "none", border: "none", cursor: "pointer" }}
+                >
+                  ← {keyPickerNote}
+                </button>
+                <div className="flex flex-col gap-2">
+                  <button
+                    type="button"
+                    onClick={() => { if (keyPickerSongId) updateSong(keyPickerSongId, { key: keyPickerNote }); setKeyPickerOpen(false); setKeyPickerNote(null); }}
+                    className="w-full rounded-lg border py-3 text-base font-semibold transition"
+                    style={{ fontFamily: "'Rajdhani', sans-serif", borderColor: "rgba(120,60,200,0.30)", background: "rgba(120,60,200,0.10)", color: "#f5ede0" }}
+                  >
+                    {keyPickerNote} Major
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { if (keyPickerSongId) updateSong(keyPickerSongId, { key: `${keyPickerNote}m` }); setKeyPickerOpen(false); setKeyPickerNote(null); }}
+                    className="w-full rounded-lg border py-3 text-base font-semibold transition"
+                    style={{ fontFamily: "'Rajdhani', sans-serif", borderColor: "rgba(120,60,200,0.30)", background: "rgba(120,60,200,0.10)", color: "#f5ede0" }}
+                  >
+                    {keyPickerNote} Minor
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
       </main>
     </>
   );

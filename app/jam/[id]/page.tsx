@@ -399,6 +399,7 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
     const [feedbackOpen, setFeedbackOpen] = useState(false);
     const [feedbackState, submitFeedback] = useForm("maqadgga");
     const [keyOpen, setKeyOpen] = useState(false);
+    const [keyPendingNote, setKeyPendingNote] = useState<string | null>(null);
     const [theorySettings, setTheorySettings] = useState<TheorySettings>(() => readTheorySettings(id));
     const [focusArea, setFocusArea] = useState<FocusArea>(DEFAULT_FOCUS_AREA);
     const [loopMode, setLoopMode] = useState(false);
@@ -1575,15 +1576,27 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
                                                     >
                                                         {song.key}
                                                     </button>
-                                                    {keyOpen && <div className="fixed inset-0 z-40" onClick={() => setKeyOpen(false)} />}
+                                                    {keyOpen && <div className="fixed inset-0 z-40" onClick={() => { setKeyOpen(false); setKeyPendingNote(null); }} />}
                                                     {keyOpen && (
                                                         <div className="absolute left-0 z-50 mt-2 rounded-xl border p-3 shadow-[0_18px_40px_rgba(0,0,0,0.35)] border-white/12" style={{ width: 220, background: "#0f0f0f" }}>
-                                                            <div className="mb-2 text-[10px] uppercase tracking-[0.16em]" style={{ fontFamily: "'Rajdhani', sans-serif", color: "rgba(255,255,255,0.55)" }}>Select Root Note</div>
-                                                            <div className="grid grid-cols-4 gap-1.5">
-                                                                {keyOptions.filter(k => k !== "Unknown" && !k.includes("m")).map((note) => (
-                                                                    <button key={note} type="button" onClick={() => { updateSong({ key: note }); setKeyOpen(false); }} className="rounded-lg border py-2 text-sm font-semibold transition border-white/12 bg-white/5 text-white hover:border-white/40 hover:bg-white/15" style={{ fontFamily: "'Rajdhani', sans-serif" }}>{note}</button>
-                                                                ))}
-                                                            </div>
+                                                            {!keyPendingNote ? (
+                                                                <>
+                                                                    <div className="mb-2 text-[10px] uppercase tracking-[0.16em]" style={{ fontFamily: "'Rajdhani', sans-serif", color: "rgba(255,255,255,0.55)" }}>Select Root Note</div>
+                                                                    <div className="grid grid-cols-4 gap-1.5">
+                                                                        {keyOptions.filter(k => k !== "Unknown" && !k.includes("m")).map((note) => (
+                                                                            <button key={note} type="button" onClick={() => setKeyPendingNote(note)} className="rounded-lg border py-2 text-sm font-semibold transition border-white/12 bg-white/5 text-white hover:border-white/40 hover:bg-white/15" style={{ fontFamily: "'Rajdhani', sans-serif" }}>{note}</button>
+                                                                        ))}
+                                                                    </div>
+                                                                </>
+                                                            ) : (
+                                                                <>
+                                                                    <button type="button" onClick={() => setKeyPendingNote(null)} className="mb-2 text-[10px] uppercase tracking-[0.16em] transition" style={{ fontFamily: "'Rajdhani', sans-serif", color: "rgba(255,255,255,0.55)", background: "none", border: "none", cursor: "pointer" }}>← {keyPendingNote}</button>
+                                                                    <div className="flex flex-col gap-2">
+                                                                        <button type="button" onClick={() => { updateSong({ key: keyPendingNote }); setKeyPendingNote(null); setKeyOpen(false); }} className="w-full rounded-lg border py-3 text-base font-semibold transition border-white/20 bg-white/8 text-white hover:border-white/50 hover:bg-white/18" style={{ fontFamily: "'Rajdhani', sans-serif" }}>{keyPendingNote} Major</button>
+                                                                        <button type="button" onClick={() => { updateSong({ key: `${keyPendingNote}m` }); setKeyPendingNote(null); setKeyOpen(false); }} className="w-full rounded-lg border py-3 text-base font-semibold transition border-white/20 bg-white/8 text-white hover:border-white/50 hover:bg-white/18" style={{ fontFamily: "'Rajdhani', sans-serif" }}>{keyPendingNote} Minor</button>
+                                                                    </div>
+                                                                </>
+                                                            )}
                                                         </div>
                                                     )}
                                                 </div>
@@ -1665,15 +1678,27 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
                                                     >
                                                         {song.key}
                                                     </button>
-                                                    {keyOpen && <div className="fixed inset-0 z-40" onClick={() => setKeyOpen(false)} />}
+                                                    {keyOpen && <div className="fixed inset-0 z-40" onClick={() => { setKeyOpen(false); setKeyPendingNote(null); }} />}
                                                     {keyOpen && (
                                                         <div className="absolute right-0 z-50 mt-2 rounded-xl border p-3 shadow-[0_18px_40px_rgba(0,0,0,0.35)] border-white/12" style={{ width: 220, background: "#0f0f0f" }}>
-                                                            <div className="mb-2 text-[10px] uppercase tracking-[0.16em]" style={{ fontFamily: "'Rajdhani', sans-serif", color: "rgba(255,255,255,0.55)" }}>Select Root Note</div>
-                                                            <div className="grid grid-cols-4 gap-1.5">
-                                                                {keyOptions.filter(k => k !== "Unknown" && !k.includes("m")).map((note) => (
-                                                                    <button key={note} type="button" onClick={() => { updateSong({ key: note }); setKeyOpen(false); }} className="rounded-lg border py-2 text-sm font-semibold transition border-white/12 bg-white/5 text-white hover:border-white/40 hover:bg-white/15" style={{ fontFamily: "'Rajdhani', sans-serif" }}>{note}</button>
-                                                                ))}
-                                                            </div>
+                                                            {!keyPendingNote ? (
+                                                                <>
+                                                                    <div className="mb-2 text-[10px] uppercase tracking-[0.16em]" style={{ fontFamily: "'Rajdhani', sans-serif", color: "rgba(255,255,255,0.55)" }}>Select Root Note</div>
+                                                                    <div className="grid grid-cols-4 gap-1.5">
+                                                                        {keyOptions.filter(k => k !== "Unknown" && !k.includes("m")).map((note) => (
+                                                                            <button key={note} type="button" onClick={() => setKeyPendingNote(note)} className="rounded-lg border py-2 text-sm font-semibold transition border-white/12 bg-white/5 text-white hover:border-white/40 hover:bg-white/15" style={{ fontFamily: "'Rajdhani', sans-serif" }}>{note}</button>
+                                                                        ))}
+                                                                    </div>
+                                                                </>
+                                                            ) : (
+                                                                <>
+                                                                    <button type="button" onClick={() => setKeyPendingNote(null)} className="mb-2 text-[10px] uppercase tracking-[0.16em] transition" style={{ fontFamily: "'Rajdhani', sans-serif", color: "rgba(255,255,255,0.55)", background: "none", border: "none", cursor: "pointer" }}>← {keyPendingNote}</button>
+                                                                    <div className="flex flex-col gap-2">
+                                                                        <button type="button" onClick={() => { updateSong({ key: keyPendingNote }); setKeyPendingNote(null); setKeyOpen(false); }} className="w-full rounded-lg border py-3 text-base font-semibold transition border-white/20 bg-white/8 text-white hover:border-white/50 hover:bg-white/18" style={{ fontFamily: "'Rajdhani', sans-serif" }}>{keyPendingNote} Major</button>
+                                                                        <button type="button" onClick={() => { updateSong({ key: `${keyPendingNote}m` }); setKeyPendingNote(null); setKeyOpen(false); }} className="w-full rounded-lg border py-3 text-base font-semibold transition border-white/20 bg-white/8 text-white hover:border-white/50 hover:bg-white/18" style={{ fontFamily: "'Rajdhani', sans-serif" }}>{keyPendingNote} Minor</button>
+                                                                    </div>
+                                                                </>
+                                                            )}
                                                         </div>
                                                     )}
                                                 </div>
