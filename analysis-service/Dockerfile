@@ -2,6 +2,9 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
+# gcc/g++ needed to compile madmom's Cython extensions (no Python 3.11 wheel on PyPI)
+RUN apt-get update && apt-get install -y --no-install-recommends gcc g++ && rm -rf /var/lib/apt/lists/*
+
 COPY analysis-service/requirements.txt /app/requirements.txt
 # Install CPU-only torch first so lv-chordia doesn't pull in the full CUDA wheel (~2GB)
 RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu
