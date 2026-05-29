@@ -3,7 +3,9 @@ FROM node:20-bookworm-slim
 WORKDIR /app
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends python3 python3-pip python3-venv ffmpeg curl git \
+    && apt-get install -y --no-install-recommends \
+       python3 python3-pip python3-venv python3-dev \
+       ffmpeg curl git gcc g++ \
     && ln -sf /usr/bin/python3 /usr/bin/python \
     && rm -rf /var/lib/apt/lists/*
 
@@ -21,8 +23,16 @@ RUN npm ci
 COPY scripts/requirements-prototype.txt /app/scripts/requirements-prototype.txt
 RUN python3 -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
+
+# numpy before everything else — madmom's Cython extensions need numpy headers at compile time
+RUN pip install --no-cache-dir "numpy>=1.21,<2.0"
+# torch CPU first — prevents lv-chordia from pulling the 2GB CUDA wheel
+RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu
+# Core analysis dependencies (lv-chordia, soundfile, librosa)
 RUN pip install --no-cache-dir -r /app/scripts/requirements-prototype.txt \
     && pip install --no-cache-dir fastapi "uvicorn[standard]" python-multipart
+# madmom is optional — ensemble quality if it compiles, falls back to lv-chordia alone if not
+RUN pip install --no-cache-dir madmom==0.16.1 || echo "[madmom] optional install skipped"
 RUN pip install --no-cache-dir --upgrade yt-dlp pytubefix bgutil-ytdlp-pot-provider
 
 COPY . .
