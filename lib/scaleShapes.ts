@@ -71,23 +71,35 @@ export const MAJOR_PENTA_SHAPES: readonly BoxShape[] = [
 // The B string (index 4) is tuned a semitone short of standard, so its
 // highest note sits 1–2 frets above the other strings' upper bound.
 
+// Each shape is [lowE, A, D, G, B, highE], values are [minOffset, maxOffset]
+// relative to the anchor fret on low E. Derived from 3-notes-per-string rule:
+// for each string, find the 3 consecutive major-scale notes nearest the anchor
+// fret and record the fret offsets. The B string is tuned 4 semitones above G
+// (not 5) so its notes sit 1 fret higher than expected — reflected in its offsets.
+//
+// Verified for G major (anchor frets 3,5,7,8,10,0,2 for positions 1–7):
+//   P1 lowE: F#(2)–G(3)–A(5)   → [-1,2]   B: D(3)–E(5)–F#(7)  → [0,4]
+//   P2 lowE: A(5)–B(7)–C(8)    → [0,3]    A: D(5)–E(7)–F#(9)  → [0,4]
+//   P3 lowE: B(7)–C(8)–D(10)   → [0,3]    G: D(7)–E(9)–F#(11) → [0,4]
+//   P4 lowE: C(8)–D(10)–E(12)  → [0,4]    G: D(7)–E(9)–F#(11) → [-1,3]
+//   P5 lowE: D(10)–E(12)–F#(14)→ [0,4]    G: E(9)–F#(11)–G(12)→ [-1,2]
+//   P6 lowE: E(0)–F#(2)–G(3)   → [0,3]    D: D(0)–E(2)–F#(4)  → [0,4]
+//   P7 lowE: F#(2)–G(3)–A(5)   → [0,3]    B: B(0)–C(1)–D(3)   → [-2,1]
 export const DIATONIC_SHAPES: readonly BoxShape[] = [
-    // Pos 1  (anchor = R / degree 1)
-    // lowE: 7th–R–2nd  A: 4th–5th–6th  D: 1st–2nd–3rd  G: same  B: 5th–6th–7th  e: 7th–R–2nd
+    // Pos 1  (anchor = R)   lowE: 7–R–2   A: 4–5–6   D: 1–2–3   G: 2–3–4   B: 5–6–7   e: 7–R–2
     [[-1, 2], [-1, 2], [-1, 2], [-1, 2], [0, 4], [-1, 2]],
-    // Pos 2  (anchor = 2 / degree 2)
-    // lowE: 2nd–3rd–4th
-    [[0, 3], [0, 2], [0, 2], [-1, 2], [0, 4], [0, 3]],
-    // Pos 3  (anchor = 3 / degree 3)
-    [[0, 2], [0, 2], [-1, 2], [-1, 2], [0, 3], [0, 2]],
-    // Pos 4  (anchor = 4 / degree 4)
-    [[0, 3], [-1, 2], [-1, 2], [0, 2], [0, 3], [0, 3]],
-    // Pos 5  (anchor = 5 / degree 5)
-    [[0, 2], [0, 2], [0, 2], [-1, 2], [0, 3], [0, 2]],
-    // Pos 6  (anchor = 6 / degree 6)
-    [[0, 3], [0, 3], [0, 2], [0, 2], [1, 3], [0, 3]],
-    // Pos 7  (anchor = 7 / degree 7)
-    [[0, 2], [0, 2], [-1, 2], [-1, 2], [-1, 1], [0, 2]],
+    // Pos 2  (anchor = 2)   lowE: 2–3–4   A: 5–6–7   D: 5–6–7   G: 1–2–3   B: 6–7–R   e: 2–3–4
+    [[0, 3], [0, 4], [0, 4], [-1, 2], [0, 3], [0, 3]],
+    // Pos 3  (anchor = 3)   lowE: 3–4–5   A: 6–7–R   D: 4–5–6   G: 5–6–7   B: 7–R–2   e: 3–4–5
+    [[0, 3], [0, 3], [0, 3], [0, 4], [0, 3], [0, 3]],
+    // Pos 4  (anchor = 4)   lowE: 4–5–6   A: 1–2–3   D: 7–R–2   G: 5–6–7   B: R–2–3   e: 4–5–6
+    [[0, 4], [-1, 2], [-1, 2], [-1, 3], [0, 4], [0, 4]],
+    // Pos 5  (anchor = 5)   lowE: 5–6–7   A: 5–6–7   D: 4–5–6   G: 6–7–R   B: 4–5–6   e: 5–6–7
+    [[0, 4], [0, 4], [0, 4], [-1, 2], [0, 3], [0, 4]],
+    // Pos 6  (anchor = 6)   lowE: 6–7–R   A: 3–4–5   D: 6–7–R   G: 6–7–R   B: 5–6–7   e: 6–7–R
+    [[0, 3], [0, 3], [0, 4], [0, 4], [0, 3], [0, 3]],
+    // Pos 7  (anchor = 7)   lowE: 7–R–2   A: 3–4–5   D: 7–R–2   G: 2–3–4   B: 3–4–5   e: 7–R–2
+    [[0, 3], [0, 3], [0, 3], [0, 3], [-2, 1], [0, 3]],
 ] as const;
 
 // Natural minor (Aeolian) = 6th mode of the major scale.
