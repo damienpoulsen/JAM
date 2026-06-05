@@ -90,6 +90,21 @@ export const DIATONIC_SHAPES: readonly BoxShape[] = [
     [[0, 2], [0, 2], [-1, 2], [-1, 2], [-1, 1], [0, 2]],
 ] as const;
 
+// Natural minor (Aeolian) = 6th mode of the major scale.
+// Minor Position N uses the same physical shape as Major Position (N+5) mod 7.
+// Without this rotation every minor position shows the wrong shape — e.g.
+// minor Position 1 would show the Ionian box (G#–A–B on low E) instead of
+// the Aeolian box (A–B–C = R–2–b3).
+export const NATURAL_MINOR_SHAPES: readonly BoxShape[] = [
+    DIATONIC_SHAPES[5], // minor pos 1  → major pos 6  (Aeolian)
+    DIATONIC_SHAPES[6], // minor pos 2  → major pos 7
+    DIATONIC_SHAPES[0], // minor pos 3  → major pos 1
+    DIATONIC_SHAPES[1], // minor pos 4  → major pos 2
+    DIATONIC_SHAPES[2], // minor pos 5  → major pos 3
+    DIATONIC_SHAPES[3], // minor pos 6  → major pos 4
+    DIATONIC_SHAPES[4], // minor pos 7  → major pos 5
+] as const;
+
 export function getShapesForSystem(
     patternSystem: "pentatonic" | "diatonic",
     isMinor: boolean,
@@ -97,5 +112,5 @@ export function getShapesForSystem(
     if (patternSystem === "pentatonic") {
         return isMinor ? MINOR_PENTA_SHAPES : MAJOR_PENTA_SHAPES;
     }
-    return DIATONIC_SHAPES;
+    return isMinor ? NATURAL_MINOR_SHAPES : DIATONIC_SHAPES;
 }
