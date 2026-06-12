@@ -86,35 +86,40 @@ export const MAJOR_PENTA_SHAPES: readonly BoxShape[] = [
 //   P6 lowE: E(0)–F#(2)–G(3)   → [0,3]    D: D(0)–E(2)–F#(4)  → [0,4]
 //   P7 lowE: F#(2)–G(3)–A(5)   → [0,3]    B: B(0)–C(1)–D(3)   → [-2,1]
 export const DIATONIC_SHAPES: readonly BoxShape[] = [
-    // Pos 1  (anchor = R)   lowE: 7–R–2   A: 4–5–6   D: 1–2–3   G: 2–3–4   B: 5–6–7   e: 7–R–2
-    [[-1, 2], [-1, 2], [-1, 2], [-1, 2], [0, 4], [-1, 2]],
-    // Pos 2  (anchor = 2)   lowE: 2–3–4   A: 5–6–7   D: 5–6–7   G: 1–2–3   B: 6–7–R   e: 2–3–4
-    [[0, 3], [0, 4], [0, 4], [-1, 2], [0, 3], [0, 3]],
-    // Pos 3  (anchor = 3)   lowE: 3–4–5   A: 6–7–R   D: 4–5–6   G: 5–6–7   B: 7–R–2   e: 3–4–5
-    [[0, 3], [0, 3], [0, 3], [0, 4], [0, 3], [0, 3]],
-    // Pos 4  (anchor = 4)   lowE: 4–5–6   A: 1–2–3   D: 7–R–2   G: 5–6–7   B: R–2–3   e: 4–5–6
-    [[0, 4], [-1, 2], [-1, 2], [-1, 3], [0, 4], [0, 4]],
-    // Pos 5  (anchor = 5)   lowE: 5–6–7   A: 5–6–7   D: 4–5–6   G: 6–7–R   B: 4–5–6   e: 5–6–7
-    [[0, 4], [0, 4], [0, 4], [-1, 2], [0, 3], [0, 4]],
-    // Pos 6  (anchor = 6)   lowE: 6–7–R   A: 3–4–5   D: 6–7–R   G: 6–7–R   B: 5–6–7   e: 6–7–R
-    [[0, 3], [0, 3], [0, 4], [0, 4], [0, 3], [0, 3]],
-    // Pos 7  (anchor = 7)   lowE: 7–R–2   A: 3–4–5   D: 7–R–2   G: 2–3–4   B: 3–4–5   e: 7–R–2
-    [[0, 3], [0, 3], [0, 3], [0, 3], [-2, 1], [0, 3]],
+    // Pos 1  (anchor = R)   lowE: 7–R–2   A: 3–4–5   D: 6–7–R   G: 2–3–4   B: 5–6–7   e: R–2–3
+    [[-1, 2], [-1, 2], [-1, 2], [-1, 2], [0, 4], [0, 4]],
+    // Pos 2  (anchor = 2)   lowE: R–2–3   A: 4–5–6   D: 7–R–2   G: 3–4–5   B: 6–7–R   e: 2–3–4
+    [[-2, 2], [-2, 2], [-1, 2], [-1, 2], [0, 3], [0, 3]],
+    // Pos 3  (anchor = 3)   lowE: 2–3–4   A: 5–6–7   D: R–2–3   G: 4–5–6   B: 7–R–2   e: 3–4–5
+    [[-2, 1], [-2, 2], [-2, 2], [-2, 2], [0, 3], [0, 3]],
+    // Pos 4  (anchor = 4)   lowE: 3–4–5   A: 6–7–R   D: 2–3–4   G: 5–6–7   B: R–2–3   e: 4–5–6
+    [[-1, 2], [-1, 2], [-1, 2], [-1, 3], [0, 4], [0, 4]],
+    // Pos 5  (anchor = 5)   lowE: 4–5–6   A: 7–R–2   D: 3–4–5   G: 6–7–R   B: 2–3–4   e: 5–6–7
+    [[-2, 2], [-1, 2], [-1, 2], [-1, 2], [0, 3], [0, 4]],
+    // Pos 6  (anchor = 6)   lowE: 5–6–7   A: R–2–3   D: 4–5–6   G: 7–R–2   B: 3–4–5   e: 6–7–R
+    [[10, 14], [10, 14], [10, 14], [11, 14], [12, 15], [12, 15]],
+    // Pos 7  (anchor = 7)   lowE: 6–7–R   A: 2–3–4   D: 5–6–7   G: R–2–3   B: 4–5–6   e: 7–R–2
+    [[10, 13], [10, 13], [10, 14], [10, 14], [11, 15], [12, 15]],
 ] as const;
 
-// Natural minor (Aeolian) = 6th mode of the major scale.
-// Minor Position N uses the same physical shape as Major Position (N+5) mod 7.
-// Without this rotation every minor position shows the wrong shape — e.g.
-// minor Position 1 would show the Ionian box (G#–A–B on low E) instead of
-// the Aeolian box (A–B–C = R–2–b3).
+// Natural minor (Aeolian) — independent DGO-sourced 3NPS shapes.
+// Anchor for pos N = the Nth degree of the natural minor scale on low E.
+// Offsets verified against G minor (anchor frets 3,5,6,8,10,11,1 for pos 1–7).
 export const NATURAL_MINOR_SHAPES: readonly BoxShape[] = [
-    DIATONIC_SHAPES[5], // minor pos 1  → major pos 6  (Aeolian)
-    DIATONIC_SHAPES[6], // minor pos 2  → major pos 7
-    DIATONIC_SHAPES[0], // minor pos 3  → major pos 1
-    DIATONIC_SHAPES[1], // minor pos 4  → major pos 2
-    DIATONIC_SHAPES[2], // minor pos 5  → major pos 3
-    DIATONIC_SHAPES[3], // minor pos 6  → major pos 4
-    DIATONIC_SHAPES[4], // minor pos 7  → major pos 5
+    // Pos 1  (anchor = R)    lowE: b7–R–2   A: b3–4–5    D: b6–b7–R   G: 2–b3–4    B: 5–b6–b7   e: R–2–b3
+    [[-2, 2], [-2, 2], [-2, 2], [-1, 2], [0, 3], [0, 3]],
+    // Pos 2  (anchor = 2)    lowE: R–2–b3   A: 4–5–b6    D: b7–R–2    G: b3–4–5    B: b6–b7–R   e: 2–b3–4
+    [[-2, 1], [-2, 1], [-2, 2], [-2, 2], [-1, 3], [0, 3]],
+    // Pos 3  (anchor = b3)   lowE: 2–b3–4   A: 5–b6–b7   D: R–2–b3    G: 4–5–b6    B: b7–R–2    e: b3–4–5
+    [[-1, 2], [-1, 2], [-1, 2], [-1, 2], [0, 4], [0, 4]],
+    // Pos 4  (anchor = 4)    lowE: b3–4–5   A: b6–b7–R   D: 2–b3–4   G: 5–b6–b7   B: R–2–b3   e: 4–5–b6
+    [[-2, 2], [-2, 2], [-1, 2], [-1, 2], [0, 3], [0, 3]],
+    // Pos 5  (anchor = 5)    lowE: 4–5–b6   A: b7–R–2   D: b3–4–5   G: b6–b7–R   B: 2–b3–4   e: 5–b6–b7
+    [[-2, 1], [-2, 2], [-2, 2], [-2, 2], [0, 3], [0, 3]],
+    // Pos 6  (anchor = b6)   lowE: 5–b6–b7   A: R–2–b3   D: 4–5–b6   G: b7–R–2   B: b3–4–5   e: b6–b7–R
+    [[-1, 2], [-1, 2], [-1, 2], [-1, 3], [0, 4], [0, 4]],
+    // Pos 7  (anchor = b7)   lowE: b6–b7–R   A: 2–b3–4   D: 5–b6–b7   G: R–2–b3   B: 4–5–b6   e: b7–R–2
+    [[10, 14], [11, 14], [11, 14], [11, 14], [12, 15], [12, 16]],
 ] as const;
 
 export function getShapesForSystem(

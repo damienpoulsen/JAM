@@ -245,47 +245,9 @@ function getChordPentatonic(currentChord: string, songKey: string): number[] {
 function getChordScale(currentChord: string, songKey: string): number[] {
     const p = parsePitch(currentChord) ?? parsePitch(songKey);
     if (!p) return [];
-    const s = getChordSuffix(currentChord);
-
-    // Dominant 7 family → Mixolydian
-    if (s === "7" || s === "9" || s === "11" || s === "13" ||
-        s.startsWith("7sus") || s.startsWith("9sus")) {
-        return buildScale(p.noteIndex, SCALE_INTERVALS.mixolydian);
-    }
-    // Major 7 family → Ionian
-    if (isMajorSuffix(s)) {
-        return buildScale(p.noteIndex, SCALE_INTERVALS.major);
-    }
-    // Minor 7 extensions → Dorian
-    if (s.startsWith("m7") || s.startsWith("m9") || s.startsWith("m11") || s.startsWith("m13")) {
-        return buildScale(p.noteIndex, SCALE_INTERVALS.dorian);
-    }
-    // Half-diminished (m7b5) → Locrian
-    if (s.includes("b5") && (s.includes("m") || s.startsWith("dim"))) {
-        return buildScale(p.noteIndex, SCALE_INTERVALS.locrian);
-    }
-    // Diminished → stacked minor-3rds (dim7 tones)
-    if (s.startsWith("dim")) {
-        return buildScale(p.noteIndex, [0, 3, 6, 9]);
-    }
-    // Augmented → augmented tones only
-    if (s.startsWith("aug") || s.includes("#5")) {
-        return buildScale(p.noteIndex, [0, 4, 8]);
-    }
-    // Sus4 → Mixolydian (resolves to dominant context)
-    if (s === "sus" || s.startsWith("sus4")) {
-        return buildScale(p.noteIndex, SCALE_INTERVALS.mixolydian);
-    }
-    // Sus2 → Ionian
-    if (s.startsWith("sus2")) {
-        return buildScale(p.noteIndex, SCALE_INTERVALS.major);
-    }
-    // Minor triad → Dorian
-    if (isMinorSuffix(s) && !isMajorSuffix(s)) {
-        return buildScale(p.noteIndex, SCALE_INTERVALS.dorian);
-    }
-    // Default: major triad → Ionian
-    return buildScale(p.noteIndex, SCALE_INTERVALS.major);
+    return p.isMinor
+        ? buildScale(p.noteIndex, SCALE_INTERVALS["natural-minor"])
+        : buildScale(p.noteIndex, SCALE_INTERVALS.major);
 }
 
 // ─── Chord tone generators ───────────────────────────────────────────────────
