@@ -8,6 +8,16 @@ export type LayerKind =
     | "key-pentatonic"
     | "chord-pentatonic"
     | "chord-scale"
+    | "blues-minor"
+    | "blues-major"
+    | "harmonic-minor"
+    | "ionian"
+    | "dorian"
+    | "phrygian"
+    | "lydian"
+    | "mixolydian"
+    | "aeolian"
+    | "locrian"
     | "root-notes"
     | "triads"
     | "chord-tones"
@@ -28,7 +38,7 @@ export type TheorySettings = {
     layer3Interval: number | null;
 };
 
-export type FocusAreaPatternSystem = "pentatonic" | "diatonic";
+export type FocusAreaPatternSystem = "pentatonic" | "diatonic" | "blues-minor" | "blues-major" | "harmonic-minor" | "mixolydian" | "dorian" | "ionian" | "locrian" | "aeolian" | "phrygian" | "lydian";
 
 export type FocusArea = {
     patternSystem: FocusAreaPatternSystem | null;
@@ -45,6 +55,16 @@ export const DEFAULT_FOCUS_AREA: FocusArea = {
 export function getFocusAreaPatternSystem(layer1Kind: LayerKind | null): FocusAreaPatternSystem | null {
     if (layer1Kind === "key-pentatonic" || layer1Kind === "chord-pentatonic") return "pentatonic";
     if (layer1Kind === "song-key" || layer1Kind === "chord-scale") return "diatonic";
+    if (layer1Kind === "blues-minor") return "blues-minor";
+    if (layer1Kind === "blues-major") return "blues-major";
+    if (layer1Kind === "harmonic-minor") return "harmonic-minor";
+    if (layer1Kind === "mixolydian") return "mixolydian";
+    if (layer1Kind === "dorian") return "dorian";
+    if (layer1Kind === "ionian") return "ionian";
+    if (layer1Kind === "locrian") return "locrian";
+    if (layer1Kind === "aeolian") return "aeolian";
+    if (layer1Kind === "phrygian") return "phrygian";
+    if (layer1Kind === "lydian") return "lydian";
     return null;
 }
 
@@ -102,6 +122,8 @@ export const DEFAULT_THEORY: TheorySettings = {
 
 export const BASE_KIND_VALUES: ReadonlyArray<LayerKind> = [
     "song-key", "chord-pentatonic", "key-pentatonic", "chord-scale",
+    "blues-minor", "blues-major", "harmonic-minor",
+    "ionian", "dorian", "phrygian", "lydian", "mixolydian", "aeolian", "locrian",
 ];
 
 export function isBaseKind(kind: LayerKind | null): boolean {
@@ -113,12 +135,27 @@ export const LAYER_GROUPS: ReadonlyArray<{
     options: ReadonlyArray<{ value: LayerKind; label: string }>;
 }> = [
     {
-        label: "BASE LAYERS",
+        label: "SCALES",
         options: [
             { value: "key-pentatonic",   label: "Key Pentatonic" },
             { value: "chord-pentatonic", label: "Chord Pentatonics" },
             { value: "song-key",         label: "Key Diatonic" },
             { value: "chord-scale",      label: "Chord Diatonic" },
+            { value: "blues-minor",      label: "Blues Minor" },
+            { value: "blues-major",      label: "Blues Major" },
+            { value: "harmonic-minor",   label: "Harmonic Minor" },
+        ],
+    },
+    {
+        label: "MODES",
+        options: [
+            { value: "ionian",      label: "Ionian" },
+            { value: "dorian",      label: "Dorian" },
+            { value: "phrygian",    label: "Phrygian" },
+            { value: "lydian",      label: "Lydian" },
+            { value: "mixolydian",  label: "Mixolydian" },
+            { value: "aeolian",     label: "Aeolian" },
+            { value: "locrian",     label: "Locrian" },
         ],
     },
     {
@@ -159,13 +196,18 @@ const NOTE_INDEX: Record<string, number> = {
 };
 
 const SCALE_INTERVALS = {
-    major:           [0, 2, 4, 5, 7, 9, 11] as const,
-    dorian:          [0, 2, 3, 5, 7, 9, 10] as const,
-    mixolydian:      [0, 2, 4, 5, 7, 9, 10] as const,
-    "natural-minor": [0, 2, 3, 5, 7, 8, 10] as const,
-    locrian:         [0, 1, 3, 5, 6, 8, 10] as const,
-    "major-penta":   [0, 2, 4, 7, 9]        as const,
-    "minor-penta":   [0, 3, 5, 7, 10]       as const,
+    major:             [0, 2, 4, 5, 7, 9, 11] as const,
+    dorian:            [0, 2, 3, 5, 7, 9, 10] as const,
+    phrygian:          [0, 1, 3, 5, 7, 8, 10] as const,
+    lydian:            [0, 2, 4, 6, 7, 9, 11] as const,
+    mixolydian:        [0, 2, 4, 5, 7, 9, 10] as const,
+    "natural-minor":   [0, 2, 3, 5, 7, 8, 10] as const,
+    locrian:           [0, 1, 3, 5, 6, 8, 10] as const,
+    "major-penta":     [0, 2, 4, 7, 9]        as const,
+    "minor-penta":     [0, 3, 5, 7, 10]       as const,
+    "blues-minor":     [0, 3, 5, 6, 7, 10]    as const,
+    "blues-major":     [0, 2, 3, 4, 7, 9]     as const,
+    "harmonic-minor":  [0, 2, 3, 5, 7, 8, 11] as const,
 };
 
 function normalizeNotes(notes: number[]): number[] {
@@ -248,6 +290,30 @@ function getChordScale(currentChord: string, songKey: string): number[] {
     return p.isMinor
         ? buildScale(p.noteIndex, SCALE_INTERVALS["natural-minor"])
         : buildScale(p.noteIndex, SCALE_INTERVALS.major);
+}
+
+function getBluesMinor(songKey: string): number[] {
+    const p = parsePitch(songKey);
+    if (!p) return [];
+    return buildScale(p.noteIndex, SCALE_INTERVALS["blues-minor"]);
+}
+
+function getBluesMajor(songKey: string): number[] {
+    const p = parsePitch(songKey);
+    if (!p) return [];
+    return buildScale(p.noteIndex, SCALE_INTERVALS["blues-major"]);
+}
+
+function getHarmonicMinor(songKey: string): number[] {
+    const p = parsePitch(songKey);
+    if (!p) return [];
+    return buildScale(p.noteIndex, SCALE_INTERVALS["harmonic-minor"]);
+}
+
+function getModeScale(mode: keyof typeof SCALE_INTERVALS, songKey: string): number[] {
+    const p = parsePitch(songKey);
+    if (!p) return [];
+    return buildScale(p.noteIndex, SCALE_INTERVALS[mode]);
 }
 
 // ─── Chord tone generators ───────────────────────────────────────────────────
@@ -351,6 +417,46 @@ export function buildLayer(config: LayerConfig, context: LayerContext): Layer | 
         case "chord-scale":
             notes = getChordScale(context.currentChord, context.songKey);
             label = "Chord Diatonic";
+            break;
+        case "blues-minor":
+            notes = getBluesMinor(context.songKey);
+            label = "Blues Minor";
+            break;
+        case "blues-major":
+            notes = getBluesMajor(context.songKey);
+            label = "Blues Major";
+            break;
+        case "harmonic-minor":
+            notes = getHarmonicMinor(context.songKey);
+            label = "Harmonic Minor";
+            break;
+        case "ionian":
+            notes = getModeScale("major", context.songKey);
+            label = "Ionian";
+            break;
+        case "dorian":
+            notes = getModeScale("dorian", context.songKey);
+            label = "Dorian";
+            break;
+        case "phrygian":
+            notes = getModeScale("phrygian", context.songKey);
+            label = "Phrygian";
+            break;
+        case "lydian":
+            notes = getModeScale("lydian", context.songKey);
+            label = "Lydian";
+            break;
+        case "mixolydian":
+            notes = getModeScale("mixolydian", context.songKey);
+            label = "Mixolydian";
+            break;
+        case "aeolian":
+            notes = getModeScale("natural-minor", context.songKey);
+            label = "Aeolian";
+            break;
+        case "locrian":
+            notes = getModeScale("locrian", context.songKey);
+            label = "Locrian";
             break;
         case "root-notes":
             notes = rootPitch ? [rootPitch.noteIndex] : [];

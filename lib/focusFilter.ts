@@ -15,12 +15,28 @@ export function parseSongKeyRoot(songKey: string): { root: number; isMinor: bool
     return { root, isMinor: match[2] === "m" };
 }
 
-const MINOR_PENTA    = [0, 3, 5, 7, 10] as const;
-const MAJOR_PENTA    = [0, 2, 4, 7,  9] as const;
-const MAJOR_SCALE    = [0, 2, 4, 5, 7, 9, 11] as const;
-const NATURAL_MINOR  = [0, 2, 3, 5, 7, 8, 10] as const;
+const MINOR_PENTA      = [0, 3, 5, 7, 10] as const;
+const MAJOR_PENTA      = [0, 2, 4, 7,  9] as const;
+const MAJOR_SCALE      = [0, 2, 4, 5, 7, 9, 11] as const;
+const NATURAL_MINOR    = [0, 2, 3, 5, 7, 8, 10] as const;
+const HARMONIC_MINOR   = [0, 2, 3, 5, 7, 8, 11] as const;
+const MIXOLYDIAN       = [0, 2, 4, 5, 7, 9, 10] as const;
+const DORIAN           = [0, 2, 3, 5, 7, 9, 10] as const;
+const LOCRIAN          = [0, 1, 3, 5, 6, 8, 10] as const;
+const PHRYGIAN         = [0, 1, 3, 5, 7, 8, 10] as const;
+const LYDIAN           = [0, 2, 4, 6, 7, 9, 11] as const;
 
-function getAnchorIntervals(patternSystem: "pentatonic" | "diatonic", isMinor: boolean) {
+function getAnchorIntervals(patternSystem: "pentatonic" | "diatonic" | "blues-minor" | "blues-major" | "harmonic-minor" | "mixolydian" | "dorian" | "ionian" | "locrian" | "aeolian" | "phrygian" | "lydian", isMinor: boolean) {
+    if (patternSystem === "blues-minor") return MINOR_PENTA;
+    if (patternSystem === "blues-major") return MAJOR_PENTA;
+    if (patternSystem === "harmonic-minor") return HARMONIC_MINOR;
+    if (patternSystem === "mixolydian") return MIXOLYDIAN;
+    if (patternSystem === "dorian") return DORIAN;
+    if (patternSystem === "ionian") return MAJOR_SCALE;
+    if (patternSystem === "locrian") return LOCRIAN;
+    if (patternSystem === "aeolian") return NATURAL_MINOR;
+    if (patternSystem === "phrygian") return PHRYGIAN;
+    if (patternSystem === "lydian") return LYDIAN;
     if (patternSystem === "pentatonic") return isMinor ? MINOR_PENTA : MAJOR_PENTA;
     return isMinor ? NATURAL_MINOR : MAJOR_SCALE;
 }
@@ -98,8 +114,10 @@ export function buildFretVisibilityFn(
             const lo = anchorFret + minOff;
             const hi = anchorFret + maxOff;
             if (fretNum >= lo - tol && fretNum <= hi + tol) return true;
-            // Octave-up check (same shape 12 frets higher) — always strict, no tolerance
+            // Octave-up: same shape 12 frets higher (positions 1–5 repeat in upper neck)
             if (fretNum >= lo + 12 && fretNum <= hi + 12) return true;
+            // Octave-down: same shape 12 frets lower (positions 6–7 spill to low frets)
+            if (fretNum >= lo - 12 && fretNum <= hi - 12) return true;
         }
         return false;
     };

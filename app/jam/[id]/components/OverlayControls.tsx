@@ -118,14 +118,14 @@ function LayerKindPicker({
             </button>
 
             {open && (
-                <div className="absolute left-0 top-[calc(100%+4px)] z-[60] w-[200px] overflow-hidden rounded-xl border border-white/12 bg-[#13131e] py-1 shadow-[0_12px_40px_rgba(0,0,0,0.5)]">
+                <div className="absolute left-0 top-[calc(100%+4px)] z-[60] w-[200px] overflow-y-auto rounded-xl border border-white/12 bg-[#13131e] py-1 shadow-[0_12px_40px_rgba(0,0,0,0.5)]" style={{ maxHeight: "min(480px, 80vh)" }}>
                     {LAYER_GROUPS.map((group) => (
                         <div key={group.label}>
                             <div className="px-3 pt-2.5 pb-1 text-[9px] font-bold uppercase tracking-[0.22em] text-white/35">
                                 {group.label}
                             </div>
                             {group.options.map((opt) => {
-                                const disabled = group.label === "BASE LAYERS" && baseLayerTaken && opt.value !== value;
+                                const disabled = isBaseKind(opt.value) && baseLayerTaken && opt.value !== value;
                                 const active = value === opt.value;
                                 return (
                                     <button

@@ -7,6 +7,10 @@ import {
     getFocusAreaPatternSystem,
 } from "@/lib/layers";
 
+function usesBoxLabels(patternSystem: ReturnType<typeof getFocusAreaPatternSystem>): boolean {
+    return patternSystem === "pentatonic" || patternSystem === "blues-minor" || patternSystem === "blues-major";
+}
+
 function derivedLabel(focusArea: FocusArea, patternSystem: ReturnType<typeof getFocusAreaPatternSystem>): string {
     const { activePositions, customFretRange } = focusArea;
     if (customFretRange && activePositions.length === 0) {
@@ -14,7 +18,7 @@ function derivedLabel(focusArea: FocusArea, patternSystem: ReturnType<typeof get
     }
     if (activePositions.length === 0) return "Full Neck";
     const sorted = [...activePositions].sort((a, b) => a - b);
-    if (patternSystem === "pentatonic") {
+    if (usesBoxLabels(patternSystem)) {
         if (sorted.length === 1) return `Box ${sorted[0]}`;
         if (sorted.length === 2) return `Box ${sorted[0]}, ${sorted[1]}`;
         return `${sorted.length} Boxes`;
@@ -39,8 +43,8 @@ export default function FocusAreaControl({
     const isFullNeck = focusArea.activePositions.length === 0 && !focusArea.customFretRange;
     const isCustom = focusArea.customFretRange !== null;
 
-    const positionCount = patternSystem === "pentatonic" ? 5 : patternSystem === "diatonic" ? 7 : 0;
-    const positionLabel = patternSystem === "pentatonic" ? "Box" : "Pos";
+    const positionCount = usesBoxLabels(patternSystem) ? 5 : (patternSystem === "diatonic" || patternSystem === "harmonic-minor" || patternSystem === "mixolydian" || patternSystem === "dorian" || patternSystem === "ionian" || patternSystem === "locrian" || patternSystem === "aeolian" || patternSystem === "phrygian" || patternSystem === "lydian") ? 7 : 0;
+    const positionLabel = usesBoxLabels(patternSystem) ? "Box" : "Pos";
 
     function togglePosition(pos: number) {
         const already = focusArea.activePositions.includes(pos);
